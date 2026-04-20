@@ -28,6 +28,9 @@ class RecommendationRequest(BaseModel):
     origin_name: str = Field(default="天安门东")
     origin_latitude: float = Field(default=39.9087)
     origin_longitude: float = Field(default=116.3975)
+    destination_name: str | None = Field(default=None)
+    destination_latitude: float | None = Field(default=None)
+    destination_longitude: float | None = Field(default=None)
     budget: float = Field(default=600)
     available_hours: float = Field(default=10)
     travel_days: int = Field(default=1)
@@ -54,15 +57,26 @@ class POIOut(BaseModel):
     description: str
 
 
+class ItineraryItem(BaseModel):
+    day_index: int
+    start_time: str
+    end_time: str
+    poi_name: str
+    stay_hours: float
+    transit_minutes_from_previous: int
+
+
 class RouteOption(BaseModel):
     title: str
     strategy: str
+    route_style: str
     score: float
     total_budget: float
     total_duration_hours: float
     total_travel_km: float
     highlight_reason: str
     pois: list[POIOut]
+    itinerary: list[ItineraryItem]
 
 
 class RecommendationResponse(BaseModel):

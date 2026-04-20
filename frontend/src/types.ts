@@ -25,6 +25,9 @@ export interface RecommendationRequest {
   origin_name: string;
   origin_latitude: number;
   origin_longitude: number;
+  destination_name: string | null;
+  destination_latitude: number | null;
+  destination_longitude: number | null;
   budget: number;
   available_hours: number;
   travel_days: number;
@@ -54,12 +57,23 @@ export interface POIOut {
 export interface RouteOption {
   title: string;
   strategy: string;
+  route_style: string;
   score: number;
   total_budget: number;
   total_duration_hours: number;
   total_travel_km: number;
   highlight_reason: string;
   pois: POIOut[];
+  itinerary: ItineraryItem[];
+}
+
+export interface ItineraryItem {
+  day_index: number;
+  start_time: string;
+  end_time: string;
+  poi_name: string;
+  stay_hours: number;
+  transit_minutes_from_previous: number;
 }
 
 export interface RecommendationResponse {

@@ -74,6 +74,20 @@ cd backend
 python seed_pois.py --replace
 ```
 
+如需从北京市文化和旅游局官方景区目录和北京旅游网详情页批量同步更完整的官方景区数据，可执行：
+
+```bash
+cd backend
+python sync_official_pois.py --replace
+```
+
+首次联调可先跑一个小样本：
+
+```bash
+cd backend
+python sync_official_pois.py --limit 10
+```
+
 5. 启动服务：
 
 ```bash
