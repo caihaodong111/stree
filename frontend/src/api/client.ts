@@ -18,7 +18,8 @@ export async function getRecommendations(
   });
 
   if (!response.ok) {
-    throw new Error("推荐接口调用失败");
+    const detail = await response.text();
+    throw new Error(detail || "推荐接口调用失败");
   }
 
   return response.json();

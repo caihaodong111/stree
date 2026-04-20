@@ -14,6 +14,7 @@ const mapElement = ref<HTMLElement | null>(null);
 const loading = ref(true);
 const error = ref("");
 const hasKey = computed(() => Boolean(import.meta.env.VITE_AMAP_KEY));
+const hasStops = computed(() => props.stops.length > 0);
 
 let mapInstance: any = null;
 let renderVersion = 0;
@@ -30,12 +31,12 @@ function createOriginMarker(AMap: any, position: Coordinate) {
   });
 }
 
-function createStopMarker(AMap: any, name: string, position: Coordinate, index: number, isFinal: boolean) {
+function createStopMarker(AMap: any, name: string, position: Coordinate, index: number) {
   return new AMap.Marker({
     position,
     title: name,
     label: {
-      content: `<div class="map-label">${isFinal ? "终点" : `途经 ${index}` } · ${name}</div>`,
+      content: `<div class="map-label">第 ${index} 站 · ${name}</div>`,
       direction: "top"
     }
   });
@@ -70,9 +71,17 @@ async function renderMap() {
     return;
   }
 
-  if (!hasKey.value) {
+  if (!hasStops.value) {
+    destroyMap();
     loading.value = false;
-    error.value = "未配置高德地图 Key。";
+    error.value = "";
+    return;
+  }
+
+  if (!hasKey.value) {
+    destroyMap();
+    loading.value = false;
+    error.value = "";
     return;
   }
 
@@ -103,8 +112,7 @@ async function renderMap() {
           AMap,
           stop.name,
           [stop.longitude, stop.latitude],
-          index + 1,
-          index === props.stops.length - 1
+          index + 1
         )
       );
     });
@@ -191,11 +199,17 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="route-map-block">
-    <div ref="mapElement" class="route-map"></div>
+    <div ref="mapElement" :class="['route-map', { 'route-map-hidden': !hasStops || !hasKey }]"></div>
 
-    <div v-if="loading" class="route-map-overlay">地图加载中...</div>
+    <div v-if="!hasStops" class="route-map-overlay">
+      输入核心景点后，这里会显示候选游玩线的地图辅助视图。
+    </div>
+    <div v-else-if="loading" class="route-map-overlay">正在绘制游玩线地图...</div>
+    <div v-else-if="!hasKey" class="route-map-overlay">
+      未启用地图展示，不影响上方游玩线推荐和下方时段建议。
+    </div>
     <div v-else-if="error" class="route-map-overlay route-map-error">
-      <p>{{ error }}</p>
+      <p>{{ error }} 不影响行程建议。</p>
     </div>
   </section>
 </template>
