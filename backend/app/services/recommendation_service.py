@@ -3,7 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.planners.beijing_route_planner import BeijingRoutePlanner
 from app.repositories.poi_repository import POIRepository
+from app.schemas.ai import AIRouteOptionAnalysis
 from app.schemas.recommendation import RecommendationRequest, RecommendationResponse
+from app.schemas.recommendation import RouteOption
+from app.services.ai_route_analyst import AIRouteAnalyst
 
 
 class RecommendationService:
@@ -14,6 +17,7 @@ class RecommendationService:
     def __init__(self) -> None:
         self.planner = BeijingRoutePlanner()
         self.poi_repository = POIRepository()
+        self.ai_route_analyst = AIRouteAnalyst()
 
     def recommend(self, payload: RecommendationRequest, db: Session) -> RecommendationResponse:
         pois = self.poi_repository.list_all(db)
@@ -24,10 +28,18 @@ class RecommendationService:
             )
         normalized_payload, applied_defaults = self._normalize_payload(payload)
         outcome = self.planner.recommend(normalized_payload, pois)
-        summary = (
-            "系统已综合预算、游玩时长、景点丰富度和地理紧凑度生成候选路线。"
-            "当前版本支持必去点串联、区域锚点规划，以及只填预算/时长的自动路线生成。"
+        summary = self._fallback_summary()
+        route_options = outcome.route_options
+        ai_analysis = self.ai_route_analyst.analyze_routes(
+            normalized_payload,
+            route_options,
+            outcome.matched_must_visit_names,
+            outcome.missing_must_visit_names,
         )
+        if ai_analysis is not None:
+            summary = ai_analysis.recommendation_summary
+            route_options = self._apply_route_analysis(route_options, ai_analysis.route_overrides)
+
         return RecommendationResponse(
             origin_name=normalized_payload.origin_name,
             recommendation_summary=summary,
@@ -35,8 +47,30 @@ class RecommendationService:
             applied_defaults=applied_defaults,
             matched_must_visit_names=outcome.matched_must_visit_names,
             missing_must_visit_names=outcome.missing_must_visit_names,
-            route_options=outcome.route_options,
+            route_options=route_options,
         )
+
+    def _fallback_summary(self) -> str:
+        return (
+            "系统已综合预算、游玩时长、景点丰富度和地理紧凑度生成候选路线。"
+            "当前版本支持必去点串联、区域锚点规划，以及只填预算/时长的自动路线生成。"
+        )
+
+    def _apply_route_analysis(
+        self,
+        route_options: list[RouteOption],
+        route_overrides: list[AIRouteOptionAnalysis],
+    ) -> list[RouteOption]:
+        override_map = {item.strategy: item.highlight_reason.strip() for item in route_overrides if item.highlight_reason.strip()}
+        if not override_map:
+            return route_options
+
+        return [
+            route.model_copy(
+                update={"highlight_reason": override_map.get(route.strategy, route.highlight_reason)}
+            )
+            for route in route_options
+        ]
 
     def _normalize_payload(self, payload: RecommendationRequest) -> tuple[RecommendationRequest, list[str]]:
         applied_defaults: list[str] = []

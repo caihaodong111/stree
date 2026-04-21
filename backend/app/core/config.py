@@ -17,10 +17,10 @@ class Settings(BaseSettings):
     mysql_password: str = Field(alias="MYSQL_PASSWORD")
     mysql_database: str = Field(default="stree", alias="MYSQL_DATABASE")
 
-    llm_provider: str = Field(default="deepseek", alias="LLM_PROVIDER")
+    llm_provider: str = Field(default="zhipu", alias="LLM_PROVIDER")
     llm_api_key: str = Field(default="", alias="LLM_API_KEY")
-    llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
-    llm_model: str = Field(default="", alias="LLM_MODEL")
+    llm_base_url: str = Field(default="https://open.bigmodel.cn/api/paas/v4", alias="LLM_BASE_URL")
+    llm_model: str = Field(default="glm-5.1", alias="LLM_MODEL")
     amap_web_service_key: str = Field(default="", alias="AMAP_WEB_SERVICE_KEY")
     amap_transit_city: str = Field(default="北京", alias="AMAP_TRANSIT_CITY")
 

@@ -13,3 +13,14 @@ class AIPlanningResponse(BaseModel):
     model: str
     normalized_request: RecommendationRequest
     assistant_reply: str
+    fallback_used: bool = False
+
+
+class AIRouteOptionAnalysis(BaseModel):
+    strategy: str
+    highlight_reason: str
+
+
+class AIRouteAnalysisResult(BaseModel):
+    recommendation_summary: str
+    route_overrides: list[AIRouteOptionAnalysis] = Field(default_factory=list)

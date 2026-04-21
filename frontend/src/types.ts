@@ -123,6 +123,7 @@ export interface AIPlanningResponse {
   model: string;
   normalized_request: RecommendationRequest;
   assistant_reply: string;
+  fallback_used: boolean;
 }
 
 export interface RouteStop {
