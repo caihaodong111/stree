@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import atan2, cos, radians, sin, sqrt
-from collections.abc import Sequence
 
 from app.models.poi import PointOfInterest
 from app.schemas.recommendation import (
@@ -11,6 +11,7 @@ from app.schemas.recommendation import (
     PreferenceWeights,
     RecommendationRequest,
     RouteOption,
+    StopHighlight,
 )
 
 
@@ -31,6 +32,13 @@ class PlannerPOI:
     description: str
 
 
+@dataclass(frozen=True)
+class PlanningOutcome:
+    route_options: list[RouteOption]
+    matched_must_visit_names: list[str]
+    missing_must_visit_names: list[str]
+
+
 class BeijingRoutePlanner:
     PHOTO_TAGS = frozenset({"拍照", "观景", "艺术", "建筑", "夜游", "园林"})
     LOW_CROWD_TAGS = frozenset({"小众", "轻松", "自然", "室内"})
@@ -40,29 +48,39 @@ class BeijingRoutePlanner:
         self,
         payload: RecommendationRequest,
         pois: Sequence[PointOfInterest],
-    ) -> list[RouteOption]:
+    ) -> PlanningOutcome:
         weights = PreferenceWeights.from_user_preferences(payload.preferences)
         planner_pois = [self._from_model(item) for item in pois]
-        candidates = self._filter_candidates(payload, planner_pois)
+        must_visit_pois, missing_must_visits = self._resolve_must_visit_pois(payload.must_visit_names, planner_pois)
+        candidates = self._filter_candidates(payload, planner_pois, must_visit_pois)
         strategies = ("balanced", "time_first", "richness_first")
 
         route_options: list[RouteOption] = []
         for strategy in strategies:
-            selected = self._build_route(candidates, payload, strategy)
+            selected = self._build_route(candidates, payload, strategy, must_visit_pois)
             if not selected:
                 continue
             route_options.append(self._build_option(selected, payload, weights, strategy))
 
         route_options.sort(key=lambda item: item.score, reverse=True)
-        return route_options
+        return PlanningOutcome(
+            route_options=route_options,
+            matched_must_visit_names=[poi.name for poi in must_visit_pois],
+            missing_must_visit_names=missing_must_visits,
+        )
 
     def _filter_candidates(
         self,
         payload: RecommendationRequest,
         pois: Sequence[PlannerPOI],
+        must_visit_pois: Sequence[PlannerPOI],
     ) -> list[PlannerPOI]:
+        must_visit_ids = {poi.id for poi in must_visit_pois}
         items: list[PlannerPOI] = []
         for poi in pois:
+            if poi.id in must_visit_ids:
+                items.append(poi)
+                continue
             if payload.preferred_districts and poi.district not in payload.preferred_districts:
                 continue
             if payload.categories and poi.category not in payload.categories:
@@ -71,6 +89,45 @@ class BeijingRoutePlanner:
                 continue
             items.append(poi)
         return items
+
+    def _resolve_must_visit_pois(
+        self,
+        requested_names: Sequence[str],
+        pois: Sequence[PlannerPOI],
+    ) -> tuple[list[PlannerPOI], list[str]]:
+        matched: list[PlannerPOI] = []
+        missing: list[str] = []
+        seen_ids: set[int] = set()
+
+        for raw_name in requested_names:
+            name = raw_name.strip()
+            normalized = self._normalize_name(name)
+            if not normalized:
+                continue
+
+            candidates = [
+                poi
+                for poi in pois
+                if normalized in self._normalize_name(poi.name) or self._normalize_name(poi.name) in normalized
+            ]
+            if not candidates:
+                missing.append(name)
+                continue
+
+            chosen = max(
+                candidates,
+                key=lambda poi: (
+                    self._match_score(normalized, self._normalize_name(poi.name)),
+                    poi.rating,
+                    poi.richness,
+                    -poi.ticket_price,
+                ),
+            )
+            if chosen.id not in seen_ids:
+                matched.append(chosen)
+                seen_ids.add(chosen.id)
+
+        return matched, missing
 
     def _from_model(self, poi: PointOfInterest) -> PlannerPOI:
         return PlannerPOI(
@@ -94,13 +151,29 @@ class BeijingRoutePlanner:
         candidates: list[PlannerPOI],
         payload: RecommendationRequest,
         strategy: str,
+        must_visit_pois: Sequence[PlannerPOI],
     ) -> list[PlannerPOI]:
         selected: list[PlannerPOI] = []
         total_budget = 0.0
         total_hours = 0.0
         current_lat = payload.origin_latitude
         current_lon = payload.origin_longitude
-        remaining = list(candidates)
+
+        required_route = self._reorder_route(list(must_visit_pois), payload)
+        for poi in required_route:
+            transit_hours = self._distance_km(current_lat, current_lon, poi.latitude, poi.longitude) / 10
+            projected_hours = total_hours + transit_hours + poi.suggested_visit_hours
+            projected_budget = total_budget + poi.ticket_price
+            if projected_hours > payload.available_hours or projected_budget > payload.budget:
+                return []
+
+            selected.append(poi)
+            total_hours = projected_hours
+            total_budget = projected_budget
+            current_lat, current_lon = poi.latitude, poi.longitude
+
+        selected_ids = {poi.id for poi in selected}
+        remaining = [poi for poi in candidates if poi.id not in selected_ids]
 
         while remaining and len(selected) < payload.max_poi_count:
             best_index: int | None = None
@@ -114,11 +187,7 @@ class BeijingRoutePlanner:
                     continue
 
                 transit_hours = distance / 10
-                projected_hours = (
-                    total_hours
-                    + transit_hours
-                    + poi.suggested_visit_hours
-                )
+                projected_hours = total_hours + transit_hours + poi.suggested_visit_hours
                 projected_budget = total_budget + poi.ticket_price
 
                 if projected_hours > payload.available_hours:
@@ -207,6 +276,7 @@ class BeijingRoutePlanner:
 
         route_style = self._route_style(payload)
         itinerary = self._build_itinerary(selected, payload, route_style)
+        stop_highlights = self._build_stop_highlights(selected, payload)
         title = self._title_for_strategy(strategy)
         reason = self._build_reason(strategy, total_budget, total_hours, selected, payload)
 
@@ -221,7 +291,86 @@ class BeijingRoutePlanner:
             highlight_reason=reason,
             pois=poi_out,
             itinerary=itinerary,
+            stop_highlights=stop_highlights,
         )
+
+    def _build_stop_highlights(
+        self,
+        selected: list[PlannerPOI],
+        payload: RecommendationRequest,
+    ) -> list[StopHighlight]:
+        highlights: list[StopHighlight] = []
+        current_lat = payload.origin_latitude
+        current_lon = payload.origin_longitude
+        normalized_must_visits = [self._normalize_name(name) for name in payload.must_visit_names]
+
+        for index, poi in enumerate(selected):
+            tags: list[str] = []
+            reason_bits: list[str] = []
+            distance_from_previous = self._distance_km(current_lat, current_lon, poi.latitude, poi.longitude)
+            title = "顺路补点"
+            normalized_poi = self._normalize_name(poi.name)
+
+            is_must_visit = any(name and (name in normalized_poi or normalized_poi in name) for name in normalized_must_visits)
+            if is_must_visit:
+                title = "必去点已锁定"
+                tags.append("必去点")
+                reason_bits.append("这是你明确写下的必去点，路线会优先保证它被排进去。")
+            elif index == 0:
+                title = "路线起手点"
+                tags.append("起手顺路")
+                reason_bits.append("它适合作为从出发地切入这条线的第一站，能先把整体动线拉顺。")
+
+            if payload.destination_name and self._destination_name_match(poi, payload.destination_name):
+                title = "区域锚点核心点"
+                tags.append("核心景点")
+                reason_bits.append(f"它和你写下的 {payload.destination_name} 直接对应，是这条线的核心锚点。")
+            elif payload.preferred_districts and poi.district in payload.preferred_districts:
+                tags.append("同片区")
+                reason_bits.append(f"它位于 {poi.district}，和你想去的片区更一致。")
+
+            if distance_from_previous <= 3:
+                tags.append("接驳短")
+                reason_bits.append(f"和上一站直线距离约 {distance_from_previous:.1f} km，顺路串联成本低。")
+            elif distance_from_previous <= 6:
+                tags.append("可顺路")
+                reason_bits.append(f"和上一站衔接还算紧凑，适合一起排进同一条线。")
+
+            if poi.ticket_price == 0:
+                tags.append("免门票")
+                reason_bits.append("门票为 0，适合在当前预算内作为补点加入。")
+            elif poi.ticket_price <= 20:
+                tags.append("低门票")
+                reason_bits.append(f"门票约 {poi.ticket_price:.0f} 元，预算压力较小。")
+
+            if payload.preferences.favor_photography and self._photo_affinity(poi) >= 2:
+                tags.append("拍照友好")
+                reason_bits.append("它本身更适合拍照出片，和你的偏好一致。")
+
+            if payload.preferences.avoid_crowds and self._low_crowd_affinity(poi) >= 2:
+                tags.append("相对轻松")
+                reason_bits.append("相对更适合走轻松节奏，能避开过于拥挤的体验。")
+
+            if poi.richness >= 88:
+                tags.append("内容丰富")
+                reason_bits.append("这个点本身可玩内容更丰富，补进来能提升整条线的层次。")
+
+            if not reason_bits:
+                reason_bits.append("它在当前预算、时长和路线顺序下综合得分较高，适合作为顺路补点。")
+
+            deduped_tags = list(dict.fromkeys(tags))[:3]
+            highlights.append(
+                StopHighlight(
+                    poi_name=poi.name,
+                    reason_title=title,
+                    reason_body=" ".join(dict.fromkeys(reason_bits)),
+                    tags=deduped_tags,
+                )
+            )
+
+            current_lat, current_lon = poi.latitude, poi.longitude
+
+        return highlights
 
     def _preference_match(
         self,
@@ -280,20 +429,29 @@ class BeijingRoutePlanner:
         payload: RecommendationRequest,
     ) -> str:
         names = " - ".join(poi.name for poi in selected[:3])
+        context_parts: list[str] = []
         preference_notes = self._preference_notes(payload)
-        preference_text = f"并兼顾 {preference_notes}，" if preference_notes else ""
+
+        if payload.must_visit_names:
+            context_parts.append(f"优先满足 { '、'.join(payload.must_visit_names[:2]) }")
+        if payload.destination_name:
+            context_parts.append(f"围绕 {payload.destination_name} 一带游玩")
+        if preference_notes:
+            context_parts.append(preference_notes)
+
+        context_text = f"并兼顾 {'、'.join(context_parts)}，" if context_parts else ""
         if strategy == "time_first":
             return (
-                f"这条路线优先压缩通勤和切换成本，{preference_text}"
+                f"这条路线优先压缩通勤和切换成本，{context_text}"
                 f"适合希望高效率游玩的用户；核心点位包括 {names}。预计 {total_hours} 小时、约 {total_budget} 元。"
             )
         if strategy == "richness_first":
             return (
-                f"这条路线优先覆盖更丰富的景点类型，{preference_text}"
+                f"这条路线优先覆盖更丰富的景点类型，{context_text}"
                 f"兼顾历史、拍照和体验层次；核心点位包括 {names}。预计 {total_hours} 小时、约 {total_budget} 元。"
             )
         return (
-            f"这条路线在预算、路程和景点质量之间做了均衡，{preference_text}"
+            f"这条路线在预算、路程和景点质量之间做了均衡，{context_text}"
             f"适合第一次来北京的用户；核心点位包括 {names}。预计 {total_hours} 小时、约 {total_budget} 元。"
         )
 
@@ -324,11 +482,7 @@ class BeijingRoutePlanner:
             stay_minutes = max(45, round(poi.suggested_visit_hours * 60))
             projected_day_minutes = elapsed_today + transit_minutes + stay_minutes
 
-            if (
-                itinerary
-                and current_day < day_count
-                and projected_day_minutes > daily_limit_minutes
-            ):
+            if itinerary and current_day < day_count and projected_day_minutes > daily_limit_minutes:
                 current_day += 1
                 current_time = self._route_day_start_minutes(route_style)
                 elapsed_today = 0
@@ -366,6 +520,7 @@ class BeijingRoutePlanner:
         utility = poi.rating * 12 + poi.richness * 0.55 + poi.popularity * 0.1
         utility += self._explicit_preference_bonus(poi, payload)
         utility += self._destination_bonus(poi, payload)
+        utility += self._district_bonus(poi, payload)
 
         if strategy == "time_first":
             utility -= current_distance * 9
@@ -411,6 +566,11 @@ class BeijingRoutePlanner:
         if self._destination_name_match(poi, payload.destination_name):
             bonus += 22
         return bonus
+
+    def _district_bonus(self, poi: PlannerPOI, payload: RecommendationRequest) -> float:
+        if payload.preferred_districts and poi.district in payload.preferred_districts:
+            return 8.0
+        return 0.0
 
     def _reorder_route(
         self,
@@ -474,8 +634,6 @@ class BeijingRoutePlanner:
             notes.append("拍照出片")
         if payload.preferences.avoid_crowds:
             notes.append("避开高人流")
-        if payload.destination_name:
-            notes.append(f"围绕 {payload.destination_name} 一带游玩")
         return "、".join(notes)
 
     def _has_destination(self, payload: RecommendationRequest) -> bool:
@@ -486,17 +644,33 @@ class BeijingRoutePlanner:
             return False
         normalized_destination = self._normalize_name(destination_name)
         normalized_poi = self._normalize_name(poi.name)
-        return (
-            bool(normalized_destination)
-            and bool(normalized_poi)
-            and (
-                normalized_destination in normalized_poi
-                or normalized_poi in normalized_destination
-            )
+        return bool(normalized_destination) and bool(normalized_poi) and (
+            normalized_destination in normalized_poi or normalized_poi in normalized_destination
         )
 
     def _normalize_name(self, value: str) -> str:
         return "".join(ch for ch in value if ch.isalnum() or "\u4e00" <= ch <= "\u9fff")
+
+    def _match_score(self, requested: str, candidate: str) -> int:
+        if not requested or not candidate:
+            return 0
+        if requested == candidate:
+            return 1000
+
+        score = 0
+        if candidate.startswith(requested):
+            score += 220
+        if candidate.endswith(requested):
+            score += 120
+        if requested in candidate:
+            score += 80
+        if candidate in requested:
+            score += 40
+
+        overlap = len(set(requested).intersection(set(candidate)))
+        score += overlap * 8
+        score -= abs(len(candidate) - len(requested)) * 10
+        return score
 
     def _route_style(self, payload: RecommendationRequest) -> str:
         if payload.travel_days >= 2 or payload.available_hours >= 11:
@@ -528,9 +702,6 @@ class BeijingRoutePlanner:
         radius = 6371.0
         d_lat = radians(lat2 - lat1)
         d_lon = radians(lon2 - lon1)
-        a = (
-            sin(d_lat / 2) ** 2
-            + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
-        )
+        a = sin(d_lat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
         c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return radius * c

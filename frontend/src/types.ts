@@ -11,14 +11,22 @@ export interface LocationPoint {
   longitude: number;
 }
 
+export interface PlaceSuggestion {
+  value: string;
+  keywords?: string[];
+  meta?: string;
+}
+
 export interface NavigationFormData {
   origin_query: string;
   destination_query: string;
-  budget: number;
-  available_hours: number;
+  district_query: string;
+  must_visit_names: string[];
+  budget: number | null;
+  available_hours: number | null;
   preference_mode: "balanced" | "time_first" | "richness_first";
   preferences: PreferenceInput;
-  max_poi_count: number;
+  max_poi_count: number | null;
 }
 
 export interface RecommendationRequest {
@@ -28,16 +36,17 @@ export interface RecommendationRequest {
   destination_name: string | null;
   destination_latitude: number | null;
   destination_longitude: number | null;
-  budget: number;
-  available_hours: number;
-  travel_days: number;
+  must_visit_names: string[];
+  budget: number | null;
+  available_hours: number | null;
+  travel_days: number | null;
   preference_mode: "balanced" | "time_first" | "richness_first";
   preferences: PreferenceInput;
   preferred_districts: string[];
   categories: string[];
   special_interests: string[];
-  max_poi_count: number;
-  max_transit_minutes_per_leg: number;
+  max_poi_count: number | null;
+  max_transit_minutes_per_leg: number | null;
 }
 
 export interface POIOut {
@@ -54,6 +63,13 @@ export interface POIOut {
   description: string;
 }
 
+export interface StopHighlight {
+  poi_name: string;
+  reason_title: string;
+  reason_body: string;
+  tags: string[];
+}
+
 export interface RouteOption {
   title: string;
   strategy: string;
@@ -65,6 +81,7 @@ export interface RouteOption {
   highlight_reason: string;
   pois: POIOut[];
   itinerary: ItineraryItem[];
+  stop_highlights: StopHighlight[];
 }
 
 export interface ItineraryItem {
@@ -80,7 +97,25 @@ export interface RecommendationResponse {
   city: string;
   origin_name: string;
   recommendation_summary: string;
+  request_profile: string;
+  applied_defaults: string[];
+  matched_must_visit_names: string[];
+  missing_must_visit_names: string[];
   route_options: RouteOption[];
+}
+
+export interface POISuggestionItem {
+  name: string;
+  district: string;
+  category: string;
+  tags: string[];
+  popularity: number;
+  rating: number;
+}
+
+export interface POISuggestionCatalogResponse {
+  pois: POISuggestionItem[];
+  districts: string[];
 }
 
 export interface AIPlanningResponse {

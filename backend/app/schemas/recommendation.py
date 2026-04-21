@@ -31,16 +31,17 @@ class RecommendationRequest(BaseModel):
     destination_name: str | None = Field(default=None)
     destination_latitude: float | None = Field(default=None)
     destination_longitude: float | None = Field(default=None)
-    budget: float = Field(default=600)
-    available_hours: float = Field(default=10)
-    travel_days: int = Field(default=1)
+    must_visit_names: list[str] = Field(default_factory=list)
+    budget: float | None = Field(default=None)
+    available_hours: float | None = Field(default=None)
+    travel_days: int | None = Field(default=None)
     preference_mode: str = Field(default="balanced")
     preferences: PreferenceInput = Field(default_factory=PreferenceInput)
     preferred_districts: list[str] = Field(default_factory=list)
     categories: list[str] = Field(default_factory=list)
     special_interests: list[str] = Field(default_factory=list)
-    max_poi_count: int = Field(default=4)
-    max_transit_minutes_per_leg: int = Field(default=60)
+    max_poi_count: int | None = Field(default=None)
+    max_transit_minutes_per_leg: int | None = Field(default=None)
 
 
 class POIOut(BaseModel):
@@ -66,6 +67,13 @@ class ItineraryItem(BaseModel):
     transit_minutes_from_previous: int
 
 
+class StopHighlight(BaseModel):
+    poi_name: str
+    reason_title: str
+    reason_body: str
+    tags: list[str] = Field(default_factory=list)
+
+
 class RouteOption(BaseModel):
     title: str
     strategy: str
@@ -77,10 +85,15 @@ class RouteOption(BaseModel):
     highlight_reason: str
     pois: list[POIOut]
     itinerary: list[ItineraryItem]
+    stop_highlights: list[StopHighlight] = Field(default_factory=list)
 
 
 class RecommendationResponse(BaseModel):
     city: str = "北京"
     origin_name: str
     recommendation_summary: str
+    request_profile: str = "generic"
+    applied_defaults: list[str] = Field(default_factory=list)
+    matched_must_visit_names: list[str] = Field(default_factory=list)
+    missing_must_visit_names: list[str] = Field(default_factory=list)
     route_options: list[RouteOption]

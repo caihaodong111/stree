@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { planStopsRoute } from "../api/client";
+import AppIcon from "./AppIcon.vue";
 import { loadAmap } from "../lib/amap";
 import type { LocationPoint } from "../types";
 
@@ -202,14 +203,40 @@ onBeforeUnmount(() => {
     <div ref="mapElement" :class="['route-map', { 'route-map-hidden': !hasStops || !hasKey }]"></div>
 
     <div v-if="!hasStops" class="route-map-overlay">
-      输入核心景点后，这里会显示候选游玩线的地图辅助视图。
+      <div class="map-empty-state">
+        <div class="map-empty-illustration">
+          <span class="map-empty-orbit orbit-a"></span>
+          <span class="map-empty-orbit orbit-b"></span>
+          <span class="map-empty-core"><AppIcon name="map" /></span>
+          <span class="map-empty-pin pin-a"><AppIcon name="pin" /></span>
+          <span class="map-empty-pin pin-b"><AppIcon name="waypoint" /></span>
+        </div>
+        <div class="map-empty-copy">
+          <strong>地图框架已就位</strong>
+          <p>当你生成路线后，这里会把起点、必去点和顺路补点放到同一张辅助地图里。</p>
+        </div>
+      </div>
     </div>
-    <div v-else-if="loading" class="route-map-overlay">正在绘制游玩线地图...</div>
+    <div v-else-if="loading" class="route-map-overlay">
+      <div class="map-state-card">
+        <span class="map-state-icon"><AppIcon name="route" /></span>
+        <strong>正在绘制路线</strong>
+        <p>系统正在把推荐点位转换成地图辅助视图。</p>
+      </div>
+    </div>
     <div v-else-if="!hasKey" class="route-map-overlay">
-      未启用地图展示，不影响上方游玩线推荐和下方时段建议。
+      <div class="map-state-card">
+        <span class="map-state-icon"><AppIcon name="map" /></span>
+        <strong>地图服务未启用</strong>
+        <p>当前环境没有配置地图展示 Key，但上方路线推荐和下方时段建议仍然可用。</p>
+      </div>
     </div>
     <div v-else-if="error" class="route-map-overlay route-map-error">
-      <p>{{ error }} 不影响行程建议。</p>
+      <div class="map-state-card">
+        <span class="map-state-icon"><AppIcon name="spark" /></span>
+        <strong>地图渲染暂时失败</strong>
+        <p>{{ error }} 不影响当前行程建议。</p>
+      </div>
     </div>
   </section>
 </template>

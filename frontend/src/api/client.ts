@@ -1,6 +1,7 @@
 import type {
   AIPlanningResponse,
   MapRouteResponse,
+  POISuggestionCatalogResponse,
   RecommendationRequest,
   RecommendationResponse,
   RouteOption
@@ -20,6 +21,17 @@ export async function getRecommendations(
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(detail || "推荐接口调用失败");
+  }
+
+  return response.json();
+}
+
+export async function getPoiSuggestions(): Promise<POISuggestionCatalogResponse> {
+  const response = await fetch(`${API_BASE}/pois/suggestions`);
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || "景点候选接口调用失败");
   }
 
   return response.json();
