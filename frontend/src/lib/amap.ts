@@ -8,6 +8,9 @@ declare global {
   }
 }
 
+const AMAP_SCRIPT_TIMEOUT_MS = 5000;
+const AMAP_GEOCODE_TIMEOUT_MS = 3500;
+
 export async function loadAmap(pluginNames: string[] = []): Promise<any> {
   if (window.AMap) {
     await loadPlugins(window.AMap, pluginNames);
@@ -30,16 +33,23 @@ export async function loadAmap(pluginNames: string[] = []): Promise<any> {
 
     window.__streeAmapPromise__ = new Promise((resolve, reject) => {
       const script = document.createElement("script");
+      const timer = window.setTimeout(() => {
+        reject(new Error("高德地图脚本加载超时。"));
+      }, AMAP_SCRIPT_TIMEOUT_MS);
       script.src = `https://webapi.amap.com/maps?v=2.0&key=${amapKey}&plugin=AMap.Scale,AMap.ToolBar,AMap.Geocoder`;
       script.async = true;
       script.onload = () => {
+        window.clearTimeout(timer);
         if (window.AMap) {
           resolve(window.AMap);
           return;
         }
         reject(new Error("高德地图脚本加载完成，但 AMap 对象不可用。"));
       };
-      script.onerror = () => reject(new Error("高德地图脚本加载失败。"));
+      script.onerror = () => {
+        window.clearTimeout(timer);
+        reject(new Error("高德地图脚本加载失败。"));
+      };
       document.head.appendChild(script);
     });
   }
@@ -71,8 +81,12 @@ export async function geocodePlace(keyword: string): Promise<{ name: string; lat
     const geocoder = new AMap.Geocoder({
       city: "全国"
     });
+    const timer = window.setTimeout(() => {
+      reject(new Error(`地点识别超时：${query}`));
+    }, AMAP_GEOCODE_TIMEOUT_MS);
 
     geocoder.getLocation(query, (status: string, result: any) => {
+      window.clearTimeout(timer);
       if (status !== "complete" || result.info !== "OK" || !result.geocodes?.length) {
         reject(new Error(`无法识别地点：${query}`));
         return;

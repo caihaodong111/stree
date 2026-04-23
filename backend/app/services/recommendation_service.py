@@ -1,32 +1,65 @@
+import logging
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.planners.beijing_route_planner import BeijingRoutePlanner
-from app.repositories.poi_repository import POIRepository
 from app.schemas.ai import AIRouteOptionAnalysis
 from app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 from app.schemas.recommendation import RouteOption
+from app.services.ai_route_generator import AIRouteGenerator
 from app.services.ai_route_analyst import AIRouteAnalyst
+from app.services.live_poi_service import LivePOIService
+
+
+logger = logging.getLogger("app.ai.recommendation")
 
 
 class RecommendationService:
     DEFAULT_BUDGET = 600.0
-    DEFAULT_AVAILABLE_HOURS = 8.0
     DEFAULT_MAX_POI_COUNT = 3
 
     def __init__(self) -> None:
         self.planner = BeijingRoutePlanner()
-        self.poi_repository = POIRepository()
+        self.ai_route_generator = AIRouteGenerator()
         self.ai_route_analyst = AIRouteAnalyst()
+        self.live_poi_service = LivePOIService()
 
     def recommend(self, payload: RecommendationRequest, db: Session) -> RecommendationResponse:
-        pois = self.poi_repository.list_all(db)
+        normalized_payload, applied_defaults = self._normalize_payload(payload)
+        pois = self.live_poi_service.list_candidates(normalized_payload, db)
         if not pois:
             raise HTTPException(
                 status_code=400,
-                detail="POI catalog is empty. Run `python seed_pois.py` in the backend directory first.",
+                detail="No candidate POIs were found from live search or local cache.",
             )
-        normalized_payload, applied_defaults = self._normalize_payload(payload)
+        logger.info(
+            "recommend start model=%s origin=%s budget=%s hours=%s max_poi=%s must_visit_count=%s candidates=%s",
+            self.ai_route_generator.client.model,
+            normalized_payload.origin_name,
+            normalized_payload.budget,
+            normalized_payload.available_hours,
+            normalized_payload.max_poi_count,
+            len(normalized_payload.must_visit_names),
+            len(pois),
+        )
+        ai_outcome = self.ai_route_generator.generate(normalized_payload, list(pois))
+
+        if ai_outcome is not None and ai_outcome.route_options:
+            logger.info("recommend using_ai_routes route_count=%s", len(ai_outcome.route_options))
+            return RecommendationResponse(
+                origin_name=normalized_payload.origin_name,
+                recommendation_summary=ai_outcome.recommendation_summary,
+                request_profile=self._request_profile(normalized_payload),
+                route_generation_source="ai_generated",
+                route_generation_note="路线由 AI 从候选景点中选点和解释，再由代码校验约束并测算真实通勤数据。",
+                applied_defaults=applied_defaults,
+                matched_must_visit_names=ai_outcome.matched_must_visit_names,
+                missing_must_visit_names=ai_outcome.missing_must_visit_names,
+                route_options=ai_outcome.route_options,
+            )
+
+        logger.warning("recommend fallback_to_rules")
         outcome = self.planner.recommend(normalized_payload, pois)
         summary = self._fallback_summary()
         route_options = outcome.route_options
@@ -37,13 +70,19 @@ class RecommendationService:
             outcome.missing_must_visit_names,
         )
         if ai_analysis is not None:
+            logger.info("recommend applied_ai_analysis route_count=%s", len(route_options))
             summary = ai_analysis.recommendation_summary
             route_options = self._apply_route_analysis(route_options, ai_analysis.route_overrides)
 
         return RecommendationResponse(
             origin_name=normalized_payload.origin_name,
             recommendation_summary=summary,
-            request_profile=self._request_profile(payload),
+            request_profile=self._request_profile(normalized_payload),
+            route_generation_source="rule_fallback",
+            route_generation_note=(
+                "路线由规则引擎生成。"
+                + (" 当前整体说明和亮点文案由 AI 审阅补充。" if ai_analysis is not None else " 当前未使用 AI 路线生成。")
+            ),
             applied_defaults=applied_defaults,
             matched_must_visit_names=outcome.matched_must_visit_names,
             missing_must_visit_names=outcome.missing_must_visit_names,
@@ -52,8 +91,8 @@ class RecommendationService:
 
     def _fallback_summary(self) -> str:
         return (
-            "系统已综合预算、游玩时长、景点丰富度和地理紧凑度生成候选路线。"
-            "当前版本支持必去点串联、区域锚点规划，以及只填预算/时长的自动路线生成。"
+            "AI 路线生成当前未给出可用方案，系统已回退到规则规划。"
+            "本版会继续基于预算、游玩时长、景点丰富度和地理紧凑度给出候选路线。"
         )
 
     def _apply_route_analysis(
@@ -82,8 +121,7 @@ class RecommendationService:
 
         available_hours = payload.available_hours
         if available_hours is None:
-            available_hours = self.DEFAULT_AVAILABLE_HOURS
-            applied_defaults.append(f"时长按默认 {int(self.DEFAULT_AVAILABLE_HOURS)} 小时处理")
+            applied_defaults.append("未设置游玩时长，本次不按时间上限过滤路线，时长仅作参考")
 
         max_poi_count = payload.max_poi_count
         if max_poi_count is None:
@@ -94,12 +132,10 @@ class RecommendationService:
             applied_defaults.append("已自动扩展点位数以容纳全部必去点")
 
         travel_days = payload.travel_days
-        if travel_days is None:
+        if travel_days is None and available_hours is not None:
             travel_days = 2 if available_hours >= 11 else 1
 
         max_transit_minutes_per_leg = payload.max_transit_minutes_per_leg
-        if max_transit_minutes_per_leg is None:
-            max_transit_minutes_per_leg = 90 if payload.must_visit_names or payload.destination_name else 75
 
         normalized_payload = payload.model_copy(
             update={

@@ -45,6 +45,16 @@ class AMapRouteProvider:
                 end,
                 extra={"city": self.city, "extensions": "all", "strategy": "0"},
             )
+            if not data.get("route", {}).get("transits"):
+                walking = await self._request("/v3/direction/walking", start, end)
+                walking_result = self._parse_walking(walking)
+                return SegmentRouteData(
+                    summary=f"当前区间暂无合适公交 / 地铁方案，已切换为步行参考 · {walking_result.summary}",
+                    duration_minutes=walking_result.duration_minutes,
+                    distance_meters=walking_result.distance_meters,
+                    price=0,
+                    polyline=walking_result.polyline,
+                )
             return self._parse_transit(data)
 
         raise HTTPException(status_code=400, detail=f"Unsupported route mode: {mode}")

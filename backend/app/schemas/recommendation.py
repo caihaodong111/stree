@@ -93,6 +93,8 @@ class RecommendationResponse(BaseModel):
     origin_name: str
     recommendation_summary: str
     request_profile: str = "generic"
+    route_generation_source: str = "rule_fallback"
+    route_generation_note: str | None = None
     applied_defaults: list[str] = Field(default_factory=list)
     matched_must_visit_names: list[str] = Field(default_factory=list)
     missing_must_visit_names: list[str] = Field(default_factory=list)

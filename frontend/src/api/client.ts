@@ -51,6 +51,23 @@ export async function planByAI(userMessage: string): Promise<AIPlanningResponse>
   return response.json();
 }
 
+export async function planByAIWithDraft(payload: {
+  user_message: string;
+  draft_request: RecommendationRequest;
+}): Promise<AIPlanningResponse> {
+  const response = await fetch(`${API_BASE}/ai/plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error("AI 规划接口调用失败");
+  }
+
+  return response.json();
+}
+
 export async function planMapRoute(payload: {
   mode: "walking" | "driving" | "transfer";
   origin_name: string;

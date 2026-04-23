@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { getRecommendations } from "./api/client";
+import { getRecommendations, planByAIWithDraft } from "./api/client";
 import AppIcon from "./components/AppIcon.vue";
 import PreferenceForm from "./components/PreferenceForm.vue";
 import RouteCard from "./components/RouteCard.vue";
 import RouteMap from "./components/RouteMap.vue";
-import { geocodePlace } from "./lib/amap";
 import type { LocationPoint, NavigationFormData, RecommendationRequest, RouteOption } from "./types";
 
 const DEFAULT_BUDGET = 600;
 const DEFAULT_AVAILABLE_HOURS = 8;
+const HOURS_PER_DAY = 8;
 
 const loading = ref(false);
 const locatingOrigin = ref(false);
@@ -20,14 +20,21 @@ const origin = ref<LocationPoint>({
   latitude: 39.9087,
   longitude: 116.3975
 });
-const destinationAnchor = ref("");
 const preferredDistrict = ref("");
 const planningRequest = ref<NavigationFormData | null>(null);
+const aiNormalizedRequest = ref<RecommendationRequest | null>(null);
 const routeOptions = ref<RouteOption[]>([]);
 const recommendedRoute = ref<RouteOption | null>(null);
+const recommendationSummary = ref("");
 const appliedDefaults = ref<string[]>([]);
 const matchedMustVisitNames = ref<string[]>([]);
 const missingMustVisitNames = ref<string[]>([]);
+const aiAssistantReply = ref("");
+const aiFallbackUsed = ref(false);
+const aiModelLabel = ref("");
+const aiParserNotes = ref<string[]>([]);
+const routeGenerationSource = ref<"ai_generated" | "rule_fallback" | "">("");
+const routeGenerationNote = ref("");
 
 const routeStops = computed<LocationPoint[]>(() => {
   return (
@@ -41,43 +48,58 @@ const routeStops = computed<LocationPoint[]>(() => {
 
 const stopHighlights = computed(() => recommendedRoute.value?.stop_highlights ?? []);
 const stopNames = computed(() => routeStops.value.map((stop) => stop.name));
+const routeGenerationLabel = computed(() => {
+  if (routeGenerationSource.value === "ai_generated") {
+    return "AI 选点 + 代码校验";
+  }
+  if (routeGenerationSource.value === "rule_fallback") {
+    return "规则选点兜底";
+  }
+  return "等待生成";
+});
 const requestedMustVisits = computed(() => planningRequest.value?.must_visit_names ?? []);
-const effectiveBudget = computed(() => planningRequest.value?.budget ?? DEFAULT_BUDGET);
-const effectiveAvailableHours = computed(() => planningRequest.value?.available_hours ?? DEFAULT_AVAILABLE_HOURS);
+const effectiveMustVisits = computed(() => aiNormalizedRequest.value?.must_visit_names ?? requestedMustVisits.value);
+const effectivePreferredDistricts = computed(
+  () => aiNormalizedRequest.value?.preferred_districts ?? (preferredDistrict.value ? [preferredDistrict.value] : [])
+);
+const effectiveBudget = computed(() => aiNormalizedRequest.value?.budget ?? planningRequest.value?.budget ?? DEFAULT_BUDGET);
+const effectiveAvailableHours = computed(
+  () => aiNormalizedRequest.value?.available_hours ?? planningRequest.value?.available_hours ?? DEFAULT_AVAILABLE_HOURS
+);
+const effectiveTravelDays = computed(() => {
+  if (aiNormalizedRequest.value?.travel_days != null) {
+    return aiNormalizedRequest.value.travel_days;
+  }
+  if (planningRequest.value?.travel_days != null) {
+    return planningRequest.value.travel_days;
+  }
+  const hours = aiNormalizedRequest.value?.available_hours ?? planningRequest.value?.available_hours;
+  if (hours == null) {
+    return null;
+  }
+  return Math.max(1, Math.round(hours / HOURS_PER_DAY));
+});
 const planningModeLabel = computed(() => {
-  const hasDestination = Boolean(destinationAnchor.value);
-  const hasDistrict = Boolean(preferredDistrict.value);
-  const mustVisitCount = requestedMustVisits.value.length;
-  const request = planningRequest.value;
+  const hasDistrict = effectivePreferredDistricts.value.length > 0;
+  const mustVisitCount = effectiveMustVisits.value.length;
+  const request = aiNormalizedRequest.value ?? planningRequest.value;
 
-  if (mustVisitCount >= 2 && (hasDestination || hasDistrict)) {
-    return "必去点串联 + 定向补点";
-  }
   if (mustVisitCount >= 2) {
-    return "多必去点串联";
-  }
-  if (mustVisitCount === 1 && (hasDestination || hasDistrict)) {
-    return "单必去点 + 定向补点";
+    return hasDistrict ? "必去点串联 + 片区补点" : "多必去点串联";
   }
   if (mustVisitCount === 1) {
-    return "单必去点规划";
-  }
-  if (hasDestination && hasDistrict) {
-    return "目的地 + 片区规划";
-  }
-  if (hasDestination) {
-    return "目的地锚点规划";
+    return hasDistrict ? "单必去点 + 片区补点" : "单必去点规划";
   }
   if (hasDistrict) {
     return "片区偏好规划";
   }
-  if (request?.budget != null && request.available_hours == null) {
+  if (request?.budget != null && request.travel_days == null) {
     return "预算导向自动规划";
   }
-  if (request?.available_hours != null && request.budget == null) {
-    return "时长导向自动规划";
+  if (request?.travel_days != null && request.budget == null) {
+    return "天数导向自动规划";
   }
-  if (request?.budget != null && request.available_hours != null) {
+  if (request?.budget != null && request.travel_days != null) {
     return "条件组合规划";
   }
   return "自由探索规划";
@@ -117,76 +139,49 @@ const routeStats = computed(() => {
   ];
 });
 const heroTitle = computed(() => {
-  const mustVisits = requestedMustVisits.value;
+  const mustVisits = effectiveMustVisits.value;
   if (mustVisits.length >= 2) {
     return `把 ${mustVisits.slice(0, 2).join(" 和 ")} 串进一条顺手的路线`;
   }
-  if (mustVisits.length === 1 && destinationAnchor.value && preferredDistrict.value) {
-    return `先保证 ${mustVisits[0]}，再围绕 ${destinationAnchor.value} 补 ${preferredDistrict.value} 内的顺路景点`;
-  }
-  if (mustVisits.length === 1 && destinationAnchor.value) {
-    return `先保证 ${mustVisits[0]}，再围绕 ${destinationAnchor.value} 补顺路景点`;
-  }
-  if (mustVisits.length === 1 && preferredDistrict.value) {
-    return `先保证 ${mustVisits[0]}，再优先补 ${preferredDistrict.value} 内的顺路景点`;
+  if (mustVisits.length === 1 && effectivePreferredDistricts.value.length) {
+    return `先保证 ${mustVisits[0]}，再优先补 ${effectivePreferredDistricts.value[0]} 内的顺路景点`;
   }
   if (mustVisits.length === 1) {
     return `先保证 ${mustVisits[0]}，再自动补顺路景点`;
   }
-  if (destinationAnchor.value && preferredDistrict.value) {
-    return `围绕 ${destinationAnchor.value}，优先落在 ${preferredDistrict.value} 的范围里排线`;
+  if (effectivePreferredDistricts.value.length) {
+    return `优先在 ${effectivePreferredDistricts.value[0]} 内生成更顺手的游玩线`;
   }
-  if (destinationAnchor.value) {
-    return `围绕 ${destinationAnchor.value} 生成更顺手的游玩线`;
+  if (planningRequest.value?.budget != null && planningRequest.value.travel_days == null) {
+    return "按预算收一条更合适的路线";
   }
-  if (preferredDistrict.value) {
-    return `优先在 ${preferredDistrict.value} 内生成更顺手的游玩线`;
+  if (planningRequest.value?.travel_days != null && planningRequest.value.budget == null) {
+    return "按天数收一条更顺手的路线";
   }
-  if (planningRequest.value?.budget != null && planningRequest.value.available_hours == null) {
-    return "按你的预算去筛当前最合适的路线";
-  }
-  if (planningRequest.value?.available_hours != null && planningRequest.value.budget == null) {
-    return "按你的可玩时长压缩最顺手的路线";
-  }
-  return "给几个条件，系统把路线先排顺";
+  return "把想去的地方，排成一条顺路的城市线";
 });
 const heroDescription = computed(() => {
-  if (requestedMustVisits.value.length) {
-    if (destinationAnchor.value && preferredDistrict.value) {
-      return "先锁定必去点，再结合具体目的地和偏好片区补点。";
-    }
-    if (destinationAnchor.value) {
-      return "先锁定必去点，再围绕具体目的地补顺路景点。";
-    }
-    if (preferredDistrict.value) {
+  if (effectiveMustVisits.value.length) {
+    if (effectivePreferredDistricts.value.length) {
       return "先锁定必去点，再优先在偏好片区里补点。";
     }
     return "先锁定必去点，再补顺路景点。";
   }
-  if (destinationAnchor.value && preferredDistrict.value) {
-    return `从 ${origin.value.name} 出发，围绕 ${destinationAnchor.value}，优先落在 ${preferredDistrict.value}。`;
+  if (effectivePreferredDistricts.value.length) {
+    return `从 ${origin.value.name} 出发，优先在 ${effectivePreferredDistricts.value[0]} 内排线。`;
   }
-  if (destinationAnchor.value) {
-    return `从 ${origin.value.name} 出发，围绕 ${destinationAnchor.value} 排线。`;
+  if (planningRequest.value?.budget != null || planningRequest.value?.travel_days != null) {
+    return "只给时间或预算，也能先出一版。";
   }
-  if (preferredDistrict.value) {
-    return `从 ${origin.value.name} 出发，优先在 ${preferredDistrict.value} 内排线。`;
-  }
-  if (planningRequest.value?.budget != null || planningRequest.value?.available_hours != null) {
-    return "只给预算或时间，也能先出一版路线。";
-  }
-  return "填几个条件，先出候选方案。";
+  return "输入必去景点、偏好区域和时间预算，系统会先给出可落到地图上的 AI 方案。";
 });
 
 const planningRouteStyle = computed(() => {
-  const availableHours = effectiveAvailableHours.value;
-  if (!availableHours) {
+  const travelDays = effectiveTravelDays.value;
+  if (!travelDays) {
     return "待生成";
   }
-  if (availableHours <= 5) {
-    return "轻松半日线";
-  }
-  if (availableHours >= 11) {
+  if (travelDays >= 2) {
     return "周末两日线";
   }
   return "一日暴走线";
@@ -197,57 +192,45 @@ const planningSummary = computed(() => {
     return "输入后这里会显示候选方案。";
   }
 
-  if (requestedMustVisits.value.length >= 2) {
-    if (destinationAnchor.value && preferredDistrict.value) {
-      return `优先串联 ${requestedMustVisits.value.join("、")}，再围绕 ${destinationAnchor.value} 补 ${preferredDistrict.value} 内的点。`;
+  if (effectiveMustVisits.value.length >= 2) {
+    if (effectivePreferredDistricts.value.length) {
+      return `优先串联 ${effectiveMustVisits.value.join("、")}，再优先在 ${effectivePreferredDistricts.value[0]} 内补点。`;
     }
-    if (destinationAnchor.value) {
-      return `优先串联 ${requestedMustVisits.value.join("、")}，再围绕 ${destinationAnchor.value} 补点。`;
-    }
-    if (preferredDistrict.value) {
-      return `优先串联 ${requestedMustVisits.value.join("、")}，再优先在 ${preferredDistrict.value} 内补点。`;
-    }
-    return `优先串联 ${requestedMustVisits.value.join("、")}。`;
+    return `优先串联 ${effectiveMustVisits.value.join("、")}。`;
   }
-  if (requestedMustVisits.value.length === 1) {
-    if (destinationAnchor.value && preferredDistrict.value) {
-      return `先保证 ${requestedMustVisits.value[0]}，再围绕 ${destinationAnchor.value} 补 ${preferredDistrict.value} 内的点。`;
+  if (effectiveMustVisits.value.length === 1) {
+    if (effectivePreferredDistricts.value.length) {
+      return `先保证 ${effectiveMustVisits.value[0]}，再优先在 ${effectivePreferredDistricts.value[0]} 内补点。`;
     }
-    if (destinationAnchor.value) {
-      return `先保证 ${requestedMustVisits.value[0]}，再围绕 ${destinationAnchor.value} 补点。`;
-    }
-    if (preferredDistrict.value) {
-      return `先保证 ${requestedMustVisits.value[0]}，再优先在 ${preferredDistrict.value} 内补点。`;
-    }
-    return `先保证 ${requestedMustVisits.value[0]}，再自动补点。`;
+    return `先保证 ${effectiveMustVisits.value[0]}，再自动补点。`;
   }
-  if (destinationAnchor.value && preferredDistrict.value) {
-    return `围绕 ${destinationAnchor.value}，优先在 ${preferredDistrict.value} 内生成 ${planningRouteStyle.value}。`;
+  if (effectivePreferredDistricts.value.length) {
+    return `优先在 ${effectivePreferredDistricts.value[0]} 内生成 ${planningRouteStyle.value}。`;
   }
-  if (destinationAnchor.value) {
-    return `围绕 ${destinationAnchor.value} 生成 ${planningRouteStyle.value}。`;
-  }
-  if (preferredDistrict.value) {
-    return `优先在 ${preferredDistrict.value} 内生成 ${planningRouteStyle.value}。`;
-  }
-  if (planningRequest.value.budget != null && planningRequest.value.available_hours == null) {
+  if (planningRequest.value.budget != null && planningRequest.value.travel_days == null) {
     return `按 ${effectiveBudget.value} 元预算自动规划。`;
   }
-  if (planningRequest.value.available_hours != null && planningRequest.value.budget == null) {
-    return `按 ${effectiveAvailableHours.value} 小时可玩时间自动规划。`;
+  if (planningRequest.value.travel_days != null && planningRequest.value.budget == null) {
+    return `按 ${effectiveTravelDays.value} 天可玩时间自动规划。`;
   }
 
   return "按默认条件生成自由行路线。";
 });
 const interpretationNotes = computed(() => {
   const notes = [...appliedDefaults.value];
+  if (routeGenerationSource.value) {
+    notes.unshift(`路线生成：${routeGenerationLabel.value}`);
+  }
+  if (aiModelLabel.value) {
+    notes.unshift(`AI 解析：${aiModelLabel.value}${aiFallbackUsed.value ? "（已回退规则解析）" : ""}`);
+  }
   if (matchedMustVisitNames.value.length) {
     notes.unshift(`已识别必去点：${matchedMustVisitNames.value.join("、")}`);
   }
   if (missingMustVisitNames.value.length) {
     notes.unshift(`暂未识别：${missingMustVisitNames.value.join("、")}`);
   }
-  return notes;
+  return [...notes, ...aiParserNotes.value];
 });
 const overviewChips = computed(() => {
   if (!planningRequest.value) {
@@ -256,24 +239,20 @@ const overviewChips = computed(() => {
 
   const chips = [`起点 ${origin.value.name}`];
 
-  if (destinationAnchor.value) {
-    chips.push(`目的地 ${destinationAnchor.value}`);
+  if (effectivePreferredDistricts.value.length) {
+    chips.push(`片区 ${effectivePreferredDistricts.value.join("、")}`);
   }
 
-  if (preferredDistrict.value) {
-    chips.push(`片区 ${preferredDistrict.value}`);
-  }
-
-  if (requestedMustVisits.value.length) {
-    chips.push(`必去 ${requestedMustVisits.value.join("、")}`);
+  if (effectiveMustVisits.value.length) {
+    chips.push(`必去 ${effectiveMustVisits.value.join("、")}`);
   }
 
   if (planningRequest.value.budget != null) {
     chips.push(`${effectiveBudget.value} 元`);
   }
 
-  if (planningRequest.value.available_hours != null) {
-    chips.push(`${effectiveAvailableHours.value} 小时`);
+  if (planningRequest.value.travel_days != null && effectiveTravelDays.value != null) {
+    chips.push(`${effectiveTravelDays.value} 天`);
   }
 
   return chips;
@@ -312,32 +291,63 @@ async function locateOrigin() {
 
 function buildRecommendationPayload(
   payload: NavigationFormData,
-  originPoint: LocationPoint,
-  destinationName: string,
-  anchorPoint: LocationPoint | null
+  originPoint: LocationPoint
 ): RecommendationRequest {
   const preferredDistricts = payload.district_query ? [payload.district_query] : [];
-  const inferredTravelDays = payload.available_hours == null ? null : payload.available_hours >= 11 ? 2 : 1;
-
   return {
     origin_name: originPoint.name,
     origin_latitude: originPoint.latitude,
     origin_longitude: originPoint.longitude,
-    destination_name: destinationName || null,
-    destination_latitude: anchorPoint?.latitude ?? null,
-    destination_longitude: anchorPoint?.longitude ?? null,
+    destination_name: null,
+    destination_latitude: null,
+    destination_longitude: null,
     must_visit_names: payload.must_visit_names,
     budget: payload.budget,
     available_hours: payload.available_hours,
-    travel_days: inferredTravelDays,
+    travel_days: payload.travel_days,
     preference_mode: payload.preference_mode,
     preferences: payload.preferences,
     preferred_districts: preferredDistricts,
     categories: [],
     special_interests: [],
-    max_poi_count: payload.max_poi_count,
-    max_transit_minutes_per_leg: payload.must_visit_names.length || destinationName || payload.district_query ? 90 : 75
+    max_poi_count: null,
+    max_transit_minutes_per_leg: null
   };
+}
+
+function buildAIUserMessage(payload: NavigationFormData, originPoint: LocationPoint): string {
+  const parts = [`我想从${originPoint.name}出发规划北京行程`];
+
+  if (payload.must_visit_names.length) {
+    parts.push(`必去景点是${payload.must_visit_names.join("、")}`);
+  }
+  if (payload.district_query) {
+    parts.push(`优先考虑${payload.district_query}`);
+  }
+  if (payload.budget != null) {
+    parts.push(`预算${payload.budget}元`);
+  }
+  if (payload.travel_days != null) {
+    parts.push(`可玩${payload.travel_days}天`);
+  }
+  if (payload.preference_mode === "time_first") {
+    parts.push("尽量省时");
+  } else if (payload.preference_mode === "richness_first") {
+    parts.push("想多看一些点");
+  } else {
+    parts.push("整体均衡一些");
+  }
+  if (payload.preferences.favor_low_budget) {
+    parts.push("尽量省钱");
+  }
+  if (payload.preferences.favor_photography) {
+    parts.push("偏好拍照");
+  }
+  if (payload.preferences.avoid_crowds) {
+    parts.push("尽量避开人多");
+  }
+
+  return `${parts.join("，")}。`;
 }
 
 function pickRoute(preferenceMode: NavigationFormData["preference_mode"], routes: RouteOption[]): RouteOption | null {
@@ -352,41 +362,11 @@ function selectRoute(route: RouteOption) {
   recommendedRoute.value = route;
 }
 
-async function resolveOriginPoint(originQuery: string): Promise<LocationPoint> {
-  const query = originQuery.trim();
-  if (!query || query === "我的位置" || query === origin.value.name) {
-    return origin.value;
-  }
-
-  try {
-    return await geocodePlace(query);
-  } catch {
-    return {
-      ...origin.value,
-      name: query
-    };
-  }
-}
-
-async function resolveDestinationPoint(destinationQuery: string): Promise<LocationPoint | null> {
-  if (!destinationQuery.trim()) {
-    return null;
-  }
-
-  try {
-    return await geocodePlace(destinationQuery);
-  } catch {
-    return null;
-  }
-}
-
 async function handleSubmit(payload: NavigationFormData) {
-  const nextDestinationQuery = payload.destination_query.trim();
   const nextDistrictQuery = payload.district_query.trim();
   const nextMustVisits = payload.must_visit_names.map((item) => item.trim()).filter(Boolean);
   const normalizedPayload: NavigationFormData = {
     ...payload,
-    destination_query: nextDestinationQuery,
     district_query: nextDistrictQuery,
     must_visit_names: nextMustVisits
   };
@@ -394,45 +374,51 @@ async function handleSubmit(payload: NavigationFormData) {
   loading.value = true;
   error.value = "";
   planningRequest.value = normalizedPayload;
-  destinationAnchor.value = nextDestinationQuery;
   preferredDistrict.value = nextDistrictQuery;
   routeOptions.value = [];
   recommendedRoute.value = null;
+  recommendationSummary.value = "";
   appliedDefaults.value = [];
   matchedMustVisitNames.value = [];
   missingMustVisitNames.value = [];
+  aiAssistantReply.value = "";
+  aiFallbackUsed.value = false;
+  aiModelLabel.value = "";
+  aiParserNotes.value = [];
+  routeGenerationSource.value = "";
+  routeGenerationNote.value = "";
+  aiNormalizedRequest.value = null;
 
   try {
-    const [nextOrigin, nextDestinationPoint] = await Promise.all([
-      resolveOriginPoint(payload.origin_query),
-      resolveDestinationPoint(nextDestinationQuery)
-    ]);
+    const recommendationPayload = buildRecommendationPayload(normalizedPayload, origin.value);
+    const aiPlanning = await planByAIWithDraft({
+      user_message: buildAIUserMessage(normalizedPayload, origin.value),
+      draft_request: recommendationPayload
+    });
+    aiAssistantReply.value = aiPlanning.assistant_reply;
+    aiFallbackUsed.value = aiPlanning.fallback_used;
+    aiModelLabel.value = `${aiPlanning.provider} / ${aiPlanning.model}`;
+    aiParserNotes.value = aiPlanning.parser_notes;
+    aiNormalizedRequest.value = aiPlanning.normalized_request;
 
-    origin.value = nextOrigin;
-
-    const recommendationPayload = buildRecommendationPayload(
-      normalizedPayload,
-      nextOrigin,
-      nextDestinationQuery,
-      nextDestinationPoint
-    );
-    const recommendation = await getRecommendations(recommendationPayload);
+    const recommendation = await getRecommendations(aiPlanning.normalized_request);
+    recommendationSummary.value = recommendation.recommendation_summary;
+    routeGenerationSource.value = recommendation.route_generation_source;
+    routeGenerationNote.value = recommendation.route_generation_note ?? "";
     appliedDefaults.value = recommendation.applied_defaults;
     matchedMustVisitNames.value = recommendation.matched_must_visit_names;
     missingMustVisitNames.value = recommendation.missing_must_visit_names;
     routeOptions.value = recommendation.route_options;
-    recommendedRoute.value = pickRoute(normalizedPayload.preference_mode, recommendation.route_options);
+    recommendedRoute.value = pickRoute(aiPlanning.normalized_request.preference_mode, recommendation.route_options);
     if (!recommendedRoute.value) {
       if (recommendation.missing_must_visit_names.length) {
         error.value = `暂未识别这些必去点：${recommendation.missing_must_visit_names.join("、")}。`;
-      } else if (nextMustVisits.length) {
-        error.value = `当前预算和时长下，暂时无法把 ${nextMustVisits.join("、")} 串成可用游玩线。`;
-      } else if (nextDestinationQuery) {
-        error.value = `围绕 ${nextDestinationQuery} 暂未生成可用游玩线。`;
-      } else if (nextDistrictQuery) {
-        error.value = `在 ${nextDistrictQuery} 内暂未生成可用游玩线。`;
+      } else if (aiPlanning.normalized_request.must_visit_names.length) {
+        error.value = `暂时无法把 ${aiPlanning.normalized_request.must_visit_names.join("、")} 串成可用游玩线。你可以继续保留这些必去点，或补充预算、时长、区域等条件让我缩小搜索范围。`;
+      } else if (aiPlanning.normalized_request.preferred_districts.length) {
+        error.value = `在 ${aiPlanning.normalized_request.preferred_districts.join("、")} 内暂未生成可用游玩线。`;
       } else {
-        error.value = "当前条件下暂未生成可用游玩线，请放宽预算、时长或减少必去点。";
+        error.value = "当前条件下暂未生成可用游玩线。你可以补充预算、时长、区域或必去点，让系统进一步收敛方案。";
       }
     }
   } catch (err) {
@@ -454,20 +440,21 @@ onMounted(() => {
     <section class="hero-panel panel">
       <div class="hero-grid">
         <div class="hero-copy">
-          <span class="hero-kicker"><AppIcon name="spark" />STREE Trip Concierge</span>
-          <h1>{{ heroTitle }}</h1>
+          <span class="hero-kicker"><AppIcon name="spark" />智悦规划</span>
+          <h1>基于 AI 的智能旅游规划系统</h1>
+          <strong class="hero-lead">{{ heroTitle }}</strong>
           <p>{{ heroDescription }}</p>
         </div>
       </div>
     </section>
 
-    <PreferenceForm :loading="loading" :initial-origin="origin" @submit="handleSubmit" @locate-origin="locateOrigin" />
+    <PreferenceForm :loading="loading" @submit="handleSubmit" />
 
     <div v-if="error" class="status-bar status-error">
       {{ error }}
     </div>
     <div v-else-if="loading" class="status-bar">
-      正在解析地点并生成路线...
+      正在用 AI 整理需求并生成路线...
     </div>
     <div v-else-if="locatingOrigin" class="status-bar">
       正在获取当前位置，不影响直接生成游玩路线。
@@ -500,6 +487,22 @@ onMounted(() => {
           </div>
 
           <p v-if="!recommendedRoute" class="overview-copy">{{ planningSummary }}</p>
+
+          <p v-if="recommendationSummary" class="overview-copy">
+            {{ recommendationSummary }}
+          </p>
+
+          <p v-if="recommendedRoute?.highlight_reason" class="overview-copy">
+            {{ recommendedRoute.highlight_reason }}
+          </p>
+
+          <p v-if="aiAssistantReply" class="overview-copy">
+            {{ aiAssistantReply }}
+          </p>
+
+          <p v-if="routeGenerationNote" class="overview-copy">
+            {{ routeGenerationNote }}
+          </p>
 
           <div v-if="interpretationNotes.length" class="stop-chip-row">
             <span v-for="note in interpretationNotes" :key="note" class="stop-chip">{{ note }}</span>
@@ -592,12 +595,19 @@ onMounted(() => {
             <strong>{{ planningModeLabel }}</strong>
           </div>
           <div class="journey-line">
-            <span><AppIcon name="map" />想去哪一带</span>
-            <strong>{{ destinationAnchor || "未限定片区" }}</strong>
+            <span><AppIcon name="spark" />路线来源</span>
+            <strong>{{ routeGenerationLabel }}</strong>
+          </div>
+          <p v-if="recommendationSummary" class="journey-empty">
+            {{ recommendationSummary }}
+          </p>
+          <div class="journey-line">
+            <span><AppIcon name="map" />偏好区域</span>
+            <strong>{{ effectivePreferredDistricts.length ? effectivePreferredDistricts.join("、") : "未限定" }}</strong>
           </div>
           <div class="journey-line">
             <span><AppIcon name="waypoint" />必去景点</span>
-            <strong>{{ requestedMustVisits.length ? requestedMustVisits.join("、") : "未指定" }}</strong>
+            <strong>{{ effectiveMustVisits.length ? effectiveMustVisits.join("、") : "未指定" }}</strong>
           </div>
           <div v-if="stopNames.length" class="journey-stop-list">
             <span v-for="name in stopNames" :key="name" class="journey-stop-chip">{{ name }}</span>

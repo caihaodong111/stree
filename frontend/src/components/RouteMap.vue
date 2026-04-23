@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { planStopsRoute } from "../api/client";
 import AppIcon from "./AppIcon.vue";
 import { loadAmap } from "../lib/amap";
-import type { LocationPoint } from "../types";
+import type { LocationPoint, MapRouteResponse } from "../types";
 
 const props = defineProps<{
   origin: LocationPoint;
@@ -14,8 +14,18 @@ const props = defineProps<{
 const mapElement = ref<HTMLElement | null>(null);
 const loading = ref(true);
 const error = ref("");
+const routeResult = ref<MapRouteResponse | null>(null);
 const hasKey = computed(() => Boolean(import.meta.env.VITE_AMAP_KEY));
 const hasStops = computed(() => props.stops.length > 0);
+const modeLabel = computed(() => {
+  if (props.mode === "walking") {
+    return "步行模式";
+  }
+  if (props.mode === "driving") {
+    return "驾车模式";
+  }
+  return "公交模式";
+});
 
 let mapInstance: any = null;
 let renderVersion = 0;
@@ -63,26 +73,66 @@ function destroyMap() {
   }
 }
 
+function formatDistance(distanceMeters: number | null) {
+  if (distanceMeters == null) {
+    return "距离待定";
+  }
+  if (distanceMeters >= 1000) {
+    return `${(distanceMeters / 1000).toFixed(1)} km`;
+  }
+  return `${distanceMeters} m`;
+}
+
+function formatPrice(price: number | null) {
+  if (price == null) {
+    return "费用待定";
+  }
+  if (price === 0) {
+    return "0 元";
+  }
+  return `${price.toFixed(0)} 元`;
+}
+
 async function renderMap() {
   const currentVersion = ++renderVersion;
   loading.value = true;
   error.value = "";
 
-  if (!mapElement.value) {
-    return;
-  }
-
   if (!hasStops.value) {
+    routeResult.value = null;
     destroyMap();
     loading.value = false;
     error.value = "";
     return;
   }
 
-  if (!hasKey.value) {
+  try {
+    routeResult.value = await planStopsRoute({
+      mode: props.mode,
+      origin_name: props.origin.name,
+      origin_longitude: props.origin.longitude,
+      origin_latitude: props.origin.latitude,
+      stops: props.stops.map((stop) => ({
+        name: stop.name,
+        longitude: stop.longitude,
+        latitude: stop.latitude
+      }))
+    });
+  } catch (err) {
+    routeResult.value = null;
     destroyMap();
     loading.value = false;
-    error.value = "";
+    error.value = err instanceof Error ? err.message : "路线测算失败。";
+    return;
+  }
+
+  if (currentVersion !== renderVersion) {
+    return;
+  }
+
+  if (!mapElement.value || !hasKey.value) {
+    destroyMap();
+    loading.value = false;
     return;
   }
 
@@ -120,28 +170,7 @@ async function renderMap() {
 
     mapInstance.add(markers);
 
-    if (!props.stops.length) {
-      mapInstance.setFitView(markers, false, [80, 80, 80, 80]);
-      return;
-    }
-
-    const routeResult = await planStopsRoute({
-      mode: props.mode,
-      origin_name: props.origin.name,
-      origin_longitude: props.origin.longitude,
-      origin_latitude: props.origin.latitude,
-      stops: props.stops.map((stop) => ({
-        name: stop.name,
-        longitude: stop.longitude,
-        latitude: stop.latitude
-      }))
-    });
-
-    if (currentVersion !== renderVersion) {
-      return;
-    }
-
-    routePolylines = routeResult.segments
+    routePolylines = (routeResult.value?.segments ?? [])
       .filter((segment) => segment.polyline.length > 1)
       .map((segment) => {
         return new AMap.Polyline({
@@ -200,42 +229,81 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="route-map-block">
-    <div ref="mapElement" :class="['route-map', { 'route-map-hidden': !hasStops || !hasKey }]"></div>
+    <div class="route-map-stage">
+      <div ref="mapElement" :class="['route-map', { 'route-map-hidden': !hasStops || !hasKey }]"></div>
 
-    <div v-if="!hasStops" class="route-map-overlay">
-      <div class="map-empty-state">
-        <div class="map-empty-illustration">
-          <span class="map-empty-orbit orbit-a"></span>
-          <span class="map-empty-orbit orbit-b"></span>
-          <span class="map-empty-core"><AppIcon name="map" /></span>
-          <span class="map-empty-pin pin-a"><AppIcon name="pin" /></span>
-          <span class="map-empty-pin pin-b"><AppIcon name="waypoint" /></span>
+      <div v-if="!hasStops" class="route-map-overlay">
+        <div class="map-empty-state">
+          <div class="map-empty-illustration">
+            <span class="map-empty-orbit orbit-a"></span>
+            <span class="map-empty-orbit orbit-b"></span>
+            <span class="map-empty-core"><AppIcon name="map" /></span>
+            <span class="map-empty-pin pin-a"><AppIcon name="pin" /></span>
+            <span class="map-empty-pin pin-b"><AppIcon name="waypoint" /></span>
+          </div>
+          <div class="map-empty-copy">
+            <strong>地图框架已就位</strong>
+            <p>当你生成路线后，这里会把起点、必去点和顺路补点放到同一张辅助地图里。</p>
+          </div>
         </div>
-        <div class="map-empty-copy">
-          <strong>地图框架已就位</strong>
-          <p>当你生成路线后，这里会把起点、必去点和顺路补点放到同一张辅助地图里。</p>
+      </div>
+      <div v-else-if="loading" class="route-map-overlay">
+        <div class="map-state-card">
+          <span class="map-state-icon"><AppIcon name="route" /></span>
+          <strong>正在绘制路线</strong>
+          <p>系统正在把推荐点位转换成真实路径和地图辅助视图。</p>
+        </div>
+      </div>
+      <div v-else-if="!hasKey" class="route-map-overlay">
+        <div class="map-state-card">
+          <span class="map-state-icon"><AppIcon name="map" /></span>
+          <strong>地图服务未启用</strong>
+          <p>当前环境没有配置地图展示 Key，但下方的分段路径和文字说明仍然可用。</p>
+        </div>
+      </div>
+      <div v-else-if="error" class="route-map-overlay route-map-error">
+        <div class="map-state-card">
+          <span class="map-state-icon"><AppIcon name="spark" /></span>
+          <strong>地图渲染暂时失败</strong>
+          <p>{{ error }}。如果后端已返回路线分段，下方仍会显示文字路径说明。</p>
         </div>
       </div>
     </div>
-    <div v-else-if="loading" class="route-map-overlay">
-      <div class="map-state-card">
-        <span class="map-state-icon"><AppIcon name="route" /></span>
-        <strong>正在绘制路线</strong>
-        <p>系统正在把推荐点位转换成地图辅助视图。</p>
+
+    <div v-if="routeResult" class="map-route-details">
+      <div class="map-route-summary">
+        <div class="map-route-summary-copy">
+          <span class="section-kicker">路径分析</span>
+          <strong>{{ routeResult.summary }}</strong>
+        </div>
+        <span class="route-style-pill route-style-muted">{{ modeLabel }}</span>
       </div>
-    </div>
-    <div v-else-if="!hasKey" class="route-map-overlay">
-      <div class="map-state-card">
-        <span class="map-state-icon"><AppIcon name="map" /></span>
-        <strong>地图服务未启用</strong>
-        <p>当前环境没有配置地图展示 Key，但上方路线推荐和下方时段建议仍然可用。</p>
+
+      <div class="map-route-stat-row">
+        <span class="stop-chip">
+          总耗时 {{ routeResult.total_duration_minutes != null ? `${routeResult.total_duration_minutes} 分钟` : "待定" }}
+        </span>
+        <span class="stop-chip">总距离 {{ formatDistance(routeResult.total_distance_meters) }}</span>
+        <span class="stop-chip">总费用 {{ formatPrice(routeResult.total_price) }}</span>
       </div>
-    </div>
-    <div v-else-if="error" class="route-map-overlay route-map-error">
-      <div class="map-state-card">
-        <span class="map-state-icon"><AppIcon name="spark" /></span>
-        <strong>地图渲染暂时失败</strong>
-        <p>{{ error }} 不影响当前行程建议。</p>
+
+      <div class="map-leg-grid">
+        <article
+          v-for="(segment, index) in routeResult.segments"
+          :key="`${segment.from_name}-${segment.to_name}-${index}`"
+          class="map-leg-card"
+        >
+          <div class="map-leg-head">
+            <strong>第 {{ index + 1 }} 段</strong>
+            <span>{{ segment.from_name }} → {{ segment.to_name }}</span>
+          </div>
+          <p>{{ segment.summary }}</p>
+          <div class="map-leg-metrics">
+            <small>耗时 {{ segment.duration_minutes != null ? `${segment.duration_minutes} 分钟` : "待定" }}</small>
+            <small>距离 {{ formatDistance(segment.distance_meters) }}</small>
+            <small>费用 {{ formatPrice(segment.price) }}</small>
+          </div>
+        </article>
       </div>
     </div>
   </section>

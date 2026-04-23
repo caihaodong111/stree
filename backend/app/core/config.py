@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    ai_log_enabled: bool = Field(default=False, alias="AI_LOG_ENABLED")
     allowed_origins_raw: str = Field(default="http://localhost:5173", alias="ALLOWED_ORIGINS")
 
     mysql_host: str = Field(alias="MYSQL_HOST")
@@ -20,7 +22,7 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default="zhipu", alias="LLM_PROVIDER")
     llm_api_key: str = Field(default="", alias="LLM_API_KEY")
     llm_base_url: str = Field(default="https://open.bigmodel.cn/api/paas/v4", alias="LLM_BASE_URL")
-    llm_model: str = Field(default="glm-5.1", alias="LLM_MODEL")
+    llm_model: str = Field(default="glm-4.7", alias="LLM_MODEL")
     amap_web_service_key: str = Field(default="", alias="AMAP_WEB_SERVICE_KEY")
     amap_transit_city: str = Field(default="北京", alias="AMAP_TRANSIT_CITY")
 
@@ -41,6 +43,10 @@ class Settings(BaseSettings):
             f"mysql+pymysql://{self.mysql_user}:{self.mysql_password}"
             f"@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}?charset=utf8mb4"
         )
+
+    @property
+    def ai_logging_enabled(self) -> bool:
+        return self.ai_log_enabled or self.app_env.lower() == "development"
 
 
 @lru_cache

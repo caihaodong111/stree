@@ -18,15 +18,13 @@ export interface PlaceSuggestion {
 }
 
 export interface NavigationFormData {
-  origin_query: string;
-  destination_query: string;
   district_query: string;
   must_visit_names: string[];
   budget: number | null;
+  travel_days: number | null;
   available_hours: number | null;
   preference_mode: "balanced" | "time_first" | "richness_first";
   preferences: PreferenceInput;
-  max_poi_count: number | null;
 }
 
 export interface RecommendationRequest {
@@ -98,6 +96,8 @@ export interface RecommendationResponse {
   origin_name: string;
   recommendation_summary: string;
   request_profile: string;
+  route_generation_source: "ai_generated" | "rule_fallback";
+  route_generation_note: string | null;
   applied_defaults: string[];
   matched_must_visit_names: string[];
   missing_must_visit_names: string[];
@@ -123,7 +123,10 @@ export interface AIPlanningResponse {
   model: string;
   normalized_request: RecommendationRequest;
   assistant_reply: string;
+  status: "ai" | "fallback";
   fallback_used: boolean;
+  fallback_reason: string | null;
+  parser_notes: string[];
 }
 
 export interface RouteStop {

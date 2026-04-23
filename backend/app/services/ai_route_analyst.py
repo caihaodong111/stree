@@ -1,8 +1,12 @@
 import json
+import logging
 
 from app.schemas.ai import AIRouteAnalysisResult
 from app.schemas.recommendation import RecommendationRequest, RouteOption
 from app.services.llm_client import LLMClientError, OpenAICompatibleLLMClient
+
+
+logger = logging.getLogger("app.ai.route_analyst")
 
 
 class AIRouteAnalyst:
@@ -17,6 +21,11 @@ class AIRouteAnalyst:
         missing_must_visit_names: list[str],
     ) -> AIRouteAnalysisResult | None:
         if not self.client.enabled or not route_options:
+            logger.warning(
+                "analyze_routes skipped enabled=%s route_count=%s",
+                self.client.enabled,
+                len(route_options),
+            )
             return None
 
         system_prompt = (
@@ -73,12 +82,14 @@ class AIRouteAnalyst:
                 temperature=0.1,
                 max_tokens=900,
             )
-        except LLMClientError:
+        except LLMClientError as exc:
+            logger.warning("analyze_routes llm_error model=%s error=%s", self.client.model, exc)
             return None
 
         try:
             result = AIRouteAnalysisResult.model_validate(raw)
-        except Exception:
+        except Exception as exc:
+            logger.warning("analyze_routes validate_failed model=%s error=%s", self.client.model, exc)
             return None
 
         valid_strategies = {route.strategy for route in route_options}
@@ -88,5 +99,7 @@ class AIRouteAnalyst:
             if override.strategy in valid_strategies and override.highlight_reason.strip()
         ]
         if not result.recommendation_summary.strip():
+            logger.warning("analyze_routes empty_summary model=%s", self.client.model)
             return None
+        logger.info("analyze_routes success model=%s overrides=%s", self.client.model, len(result.route_overrides))
         return result
