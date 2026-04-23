@@ -20,7 +20,6 @@ const origin = ref<LocationPoint>({
   latitude: 39.9087,
   longitude: 116.3975
 });
-const preferredDistrict = ref("");
 const planningRequest = ref<NavigationFormData | null>(null);
 const aiNormalizedRequest = ref<RecommendationRequest | null>(null);
 const routeOptions = ref<RouteOption[]>([]);
@@ -59,9 +58,8 @@ const routeGenerationLabel = computed(() => {
 });
 const requestedMustVisits = computed(() => planningRequest.value?.must_visit_names ?? []);
 const effectiveMustVisits = computed(() => aiNormalizedRequest.value?.must_visit_names ?? requestedMustVisits.value);
-const effectivePreferredDistricts = computed(
-  () => aiNormalizedRequest.value?.preferred_districts ?? (preferredDistrict.value ? [preferredDistrict.value] : [])
-);
+const requestedPreferredDistricts = computed(() => planningRequest.value?.preferred_districts ?? []);
+const effectivePreferredDistricts = computed(() => aiNormalizedRequest.value?.preferred_districts ?? requestedPreferredDistricts.value);
 const effectiveBudget = computed(() => aiNormalizedRequest.value?.budget ?? planningRequest.value?.budget ?? DEFAULT_BUDGET);
 const effectiveAvailableHours = computed(
   () => aiNormalizedRequest.value?.available_hours ?? planningRequest.value?.available_hours ?? DEFAULT_AVAILABLE_HOURS
@@ -110,31 +108,41 @@ const routeStats = computed(() => {
   }
 
   const dayCount = new Set(recommendedRoute.value.itinerary.map((item) => item.day_index)).size || 1;
+  const stationPreview = stopNames.value.slice(0, 6);
+  const remainingStationCount = Math.max(0, stopNames.value.length - stationPreview.length);
 
   return [
     {
       icon: "wallet" as const,
       label: "预计预算",
       value: `${recommendedRoute.value.total_budget} 元`,
-      hint: "含门票、餐饮与交通估算"
+      hint: "含门票、餐饮与交通估算",
+      chips: [] as string[],
+      extraCount: 0
     },
     {
       icon: "clock" as const,
       label: "总时长",
       value: `${recommendedRoute.value.total_duration_hours} 小时`,
-      hint: `${dayCount} 天内可完成`
+      hint: `${dayCount} 天内可完成`,
+      chips: [] as string[],
+      extraCount: 0
     },
     {
       icon: "route" as const,
       label: "空间跨度",
       value: `${recommendedRoute.value.total_travel_km} km`,
-      hint: "适合先看地图再决定节奏"
+      hint: "适合先看地图再决定节奏",
+      chips: [] as string[],
+      extraCount: 0
     },
     {
       icon: "waypoint" as const,
       label: "推荐站点",
       value: `${recommendedRoute.value.pois.length} 个`,
-      hint: stopNames.value.join(" · ") || "已自动补足顺路点"
+      hint: "已含必去点与顺路补点",
+      chips: stationPreview,
+      extraCount: remainingStationCount
     }
   ];
 });
@@ -176,17 +184,6 @@ const heroDescription = computed(() => {
   return "输入必去景点、偏好区域和时间预算，系统会先给出可落到地图上的 AI 方案。";
 });
 
-const planningRouteStyle = computed(() => {
-  const travelDays = effectiveTravelDays.value;
-  if (!travelDays) {
-    return "待生成";
-  }
-  if (travelDays >= 2) {
-    return "周末两日线";
-  }
-  return "一日暴走线";
-});
-
 const planningSummary = computed(() => {
   if (!planningRequest.value) {
     return "输入后这里会显示候选方案。";
@@ -205,7 +202,7 @@ const planningSummary = computed(() => {
     return `先保证 ${effectiveMustVisits.value[0]}，再自动补点。`;
   }
   if (effectivePreferredDistricts.value.length) {
-    return `优先在 ${effectivePreferredDistricts.value[0]} 内生成 ${planningRouteStyle.value}。`;
+    return `优先在 ${effectivePreferredDistricts.value[0]} 内生成一条顺路游玩线。`;
   }
   if (planningRequest.value.budget != null && planningRequest.value.travel_days == null) {
     return `按 ${effectiveBudget.value} 元预算自动规划。`;
@@ -258,6 +255,28 @@ const overviewChips = computed(() => {
   return chips;
 });
 
+const itineraryDays = computed(() => {
+  const itinerary = recommendedRoute.value?.itinerary ?? [];
+  const dayMap = new Map<number, typeof itinerary>();
+
+  itinerary.forEach((item) => {
+    const currentDay = dayMap.get(item.day_index) ?? [];
+    currentDay.push(item);
+    dayMap.set(item.day_index, currentDay);
+  });
+
+  return Array.from(dayMap.entries())
+    .sort(([dayA], [dayB]) => dayA - dayB)
+    .map(([dayIndex, items]) => ({
+      dayIndex,
+      items
+    }));
+});
+
+function formatStayHours(hours: number): string {
+  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+}
+
 async function locateOrigin() {
   error.value = "";
 
@@ -293,7 +312,6 @@ function buildRecommendationPayload(
   payload: NavigationFormData,
   originPoint: LocationPoint
 ): RecommendationRequest {
-  const preferredDistricts = payload.district_query ? [payload.district_query] : [];
   return {
     origin_name: originPoint.name,
     origin_latitude: originPoint.latitude,
@@ -307,7 +325,7 @@ function buildRecommendationPayload(
     travel_days: payload.travel_days,
     preference_mode: payload.preference_mode,
     preferences: payload.preferences,
-    preferred_districts: preferredDistricts,
+    preferred_districts: payload.preferred_districts,
     categories: [],
     special_interests: [],
     max_poi_count: null,
@@ -321,8 +339,8 @@ function buildAIUserMessage(payload: NavigationFormData, originPoint: LocationPo
   if (payload.must_visit_names.length) {
     parts.push(`必去景点是${payload.must_visit_names.join("、")}`);
   }
-  if (payload.district_query) {
-    parts.push(`优先考虑${payload.district_query}`);
+  if (payload.preferred_districts.length) {
+    parts.push(`优先考虑${payload.preferred_districts.join("、")}`);
   }
   if (payload.budget != null) {
     parts.push(`预算${payload.budget}元`);
@@ -355,7 +373,11 @@ function pickRoute(preferenceMode: NavigationFormData["preference_mode"], routes
     return null;
   }
 
-  return routes.find((route) => route.strategy === preferenceMode) ?? routes[0];
+  return (
+    routes.find((route) => route.option_id === preferenceMode) ??
+    routes.find((route) => route.strategy === preferenceMode) ??
+    routes[0]
+  );
 }
 
 function selectRoute(route: RouteOption) {
@@ -363,18 +385,22 @@ function selectRoute(route: RouteOption) {
 }
 
 async function handleSubmit(payload: NavigationFormData) {
-  const nextDistrictQuery = payload.district_query.trim();
+  if (payload.travel_days == null) {
+    error.value = "生成路线前请先选择天数。";
+    return;
+  }
+
+  const nextPreferredDistricts = payload.preferred_districts.map((item) => item.trim()).filter(Boolean);
   const nextMustVisits = payload.must_visit_names.map((item) => item.trim()).filter(Boolean);
   const normalizedPayload: NavigationFormData = {
     ...payload,
-    district_query: nextDistrictQuery,
+    preferred_districts: Array.from(new Set(nextPreferredDistricts)),
     must_visit_names: nextMustVisits
   };
 
   loading.value = true;
   error.value = "";
   planningRequest.value = normalizedPayload;
-  preferredDistrict.value = nextDistrictQuery;
   routeOptions.value = [];
   recommendedRoute.value = null;
   recommendationSummary.value = "";
@@ -448,13 +474,10 @@ onMounted(() => {
       </div>
     </section>
 
-    <PreferenceForm :loading="loading" @submit="handleSubmit" />
+    <PreferenceForm class="planning-form-card" :loading="loading" @submit="handleSubmit" />
 
     <div v-if="error" class="status-bar status-error">
       {{ error }}
-    </div>
-    <div v-else-if="loading" class="status-bar">
-      正在用 AI 整理需求并生成路线...
     </div>
     <div v-else-if="locatingOrigin" class="status-bar">
       正在获取当前位置，不影响直接生成游玩路线。
@@ -467,6 +490,10 @@ onMounted(() => {
             <span class="stat-card-label"><AppIcon :name="stat.icon" />{{ stat.label }}</span>
             <strong>{{ stat.value }}</strong>
             <small>{{ stat.hint }}</small>
+            <div v-if="stat.chips.length" class="stat-card-chip-scroll" :aria-label="`${stat.label}预览`">
+              <span v-for="chip in stat.chips" :key="`${stat.label}-${chip}`" class="stat-card-chip">{{ chip }}</span>
+              <span v-if="stat.extraCount" class="stat-card-chip stat-card-chip-more">+{{ stat.extraCount }}</span>
+            </div>
           </article>
         </section>
 
@@ -476,10 +503,6 @@ onMounted(() => {
               <span class="section-kicker">候选方案</span>
               <strong>{{ recommendedRoute?.title ?? planningModeLabel }}</strong>
             </div>
-
-            <span :class="['route-style-pill', { 'route-style-muted': !recommendedRoute }]">
-              {{ recommendedRoute?.route_style ?? planningRouteStyle }}
-            </span>
           </div>
 
           <div v-if="overviewChips.length" class="stop-chip-row">
@@ -511,9 +534,9 @@ onMounted(() => {
           <div v-if="routeOptions.length" class="route-card-row">
             <RouteCard
               v-for="route in routeOptions"
-              :key="route.strategy"
+              :key="route.option_id"
               :route="route"
-              :selected="recommendedRoute?.strategy === route.strategy"
+              :selected="recommendedRoute?.option_id === route.option_id"
               @select="selectRoute(route)"
             />
           </div>
@@ -524,21 +547,31 @@ onMounted(() => {
             <div>
               <span class="section-kicker">建议时段</span>
               <strong>{{ recommendedRoute.title }}</strong>
+              <p>按每天的时间顺序查看停留地点和站点间接驳时间。</p>
             </div>
-            <span class="route-style-pill">{{ recommendedRoute.route_style }}</span>
           </div>
 
-          <div class="itinerary-grid">
-            <article
-              v-for="item in recommendedRoute.itinerary"
-              :key="`${item.day_index}-${item.poi_name}-${item.start_time}`"
-              class="itinerary-item"
-            >
-              <span class="itinerary-day">Day {{ item.day_index }}</span>
-              <strong>{{ item.start_time }} - {{ item.end_time }}</strong>
-              <span>{{ item.poi_name }}</span>
-              <small>停留 {{ item.stay_hours }} 小时 · 接驳 {{ item.transit_minutes_from_previous }} 分钟</small>
-            </article>
+          <div class="itinerary-scroll">
+            <section v-for="day in itineraryDays" :key="`day-${day.dayIndex}`" class="itinerary-day-block">
+              <div class="itinerary-day-head">
+                <span class="itinerary-day-badge">Day {{ day.dayIndex }}</span>
+                <small>{{ day.items.length }} 个停留点</small>
+              </div>
+
+              <div class="itinerary-day-track" :aria-label="`Day ${day.dayIndex} 行程时间线`">
+                <template v-for="(item, index) in day.items" :key="`${day.dayIndex}-${item.poi_name}-${item.start_time}`">
+                  <article class="itinerary-stop-card">
+                    <strong>{{ item.start_time }} - {{ item.end_time }}</strong>
+                    <span class="itinerary-stop-name">{{ item.poi_name }}</span>
+                    <small>停留 {{ formatStayHours(item.stay_hours) }} 小时</small>
+                  </article>
+
+                  <div v-if="index < day.items.length - 1" class="itinerary-leg">
+                    <span>接驳 {{ day.items[index + 1].transit_minutes_from_previous }} 分钟</span>
+                  </div>
+                </template>
+              </div>
+            </section>
           </div>
         </section>
 
@@ -575,48 +608,6 @@ onMounted(() => {
       </div>
 
       <aside class="workspace-side">
-        <section class="panel journey-panel">
-          <div class="journey-panel-header">
-            <div>
-              <span class="section-kicker">当前摘要</span>
-              <strong>{{ planningRequest ? planningModeLabel : "等待输入" }}</strong>
-            </div>
-            <span :class="['route-style-pill', { 'route-style-muted': !recommendedRoute }]">
-              {{ recommendedRoute?.route_style ?? "等待生成" }}
-            </span>
-          </div>
-
-          <div class="journey-line">
-            <span><AppIcon name="pin" />起点</span>
-            <strong>{{ origin.name }}</strong>
-          </div>
-          <div class="journey-line">
-            <span><AppIcon name="briefcase" />规划方式</span>
-            <strong>{{ planningModeLabel }}</strong>
-          </div>
-          <div class="journey-line">
-            <span><AppIcon name="spark" />路线来源</span>
-            <strong>{{ routeGenerationLabel }}</strong>
-          </div>
-          <p v-if="recommendationSummary" class="journey-empty">
-            {{ recommendationSummary }}
-          </p>
-          <div class="journey-line">
-            <span><AppIcon name="map" />偏好区域</span>
-            <strong>{{ effectivePreferredDistricts.length ? effectivePreferredDistricts.join("、") : "未限定" }}</strong>
-          </div>
-          <div class="journey-line">
-            <span><AppIcon name="waypoint" />必去景点</span>
-            <strong>{{ effectiveMustVisits.length ? effectiveMustVisits.join("、") : "未指定" }}</strong>
-          </div>
-          <div v-if="stopNames.length" class="journey-stop-list">
-            <span v-for="name in stopNames" :key="name" class="journey-stop-chip">{{ name }}</span>
-          </div>
-          <p v-else-if="missingMustVisitNames.length" class="journey-empty">
-            这些必去点暂未识别：{{ missingMustVisitNames.join("、") }}。
-          </p>
-        </section>
-
         <section class="map-panel panel">
           <div class="map-panel-header">
             <div class="map-panel-copy">

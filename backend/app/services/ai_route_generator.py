@@ -1,6 +1,7 @@
 import json
 import logging
 from dataclasses import dataclass
+from math import ceil
 
 from app.models.poi import PointOfInterest
 from app.planners.beijing_route_planner import BeijingRoutePlanner, PlannerPOI
@@ -23,8 +24,10 @@ class AIRouteGenerationOutcome:
 
 class AIRouteGenerator:
     STRATEGIES = ("balanced", "time_first", "richness_first")
-    CANDIDATES_PER_STRATEGY = 4
-    MAX_SHORTLIST_SIZE = 8
+    MIN_CANDIDATES_PER_STRATEGY = 4
+    MAX_CANDIDATES_PER_STRATEGY = 18
+    MIN_SHORTLIST_SIZE = 8
+    MAX_SHORTLIST_SIZE = 48
 
     def __init__(self) -> None:
         self.client = OpenAICompatibleLLMClient()
@@ -105,10 +108,13 @@ class AIRouteGenerator:
             "你是北京旅行路线设计助手。"
             "基于用户条件和候选景点生成 1 到 3 个可落地方案。"
             "候选景点只是可选素材，不代表用户已指定；只有 must_visit_names 才是硬约束。"
+            "must_visit_names 代表用户必须去的点，但通常不等于完整行程；如果天数、时长、预算仍有余量，必须主动补入顺路且合理的景点，把每天行程补得更接近真实出游。"
+            "除非预算或时长明显不足，否则不要只返回必去点本身。"
             "只能使用候选池里的景点，poi_names 必须逐字复用候选名称。"
             "不要虚构景点、坐标、门票、时长、距离、营业信息或交通事实。"
             "strategy 只能是 balanced、time_first、richness_first。"
             "每个方案要尽量顺路，并尽量满足预算、时长、点位数上限。"
+            "如果 request.target_poi_count 大于 must_visit_names 数量，优先把 poi_names 补到接近 target_poi_count。"
             "如果无法满足某个必去点，把它写进 missing_must_visit_names。"
             "只输出一个 JSON 对象，不要 Markdown，不要解释，不要推理过程。"
             'JSON: {"recommendation_summary":"","missing_must_visit_names":[],"route_options":[{"strategy":"","title":"","highlight_reason":"","poi_names":[],"stop_highlights":[{"poi_name":"","reason_title":"","reason_body":"","tags":[]}]}]}'
@@ -151,6 +157,12 @@ class AIRouteGenerator:
         selected: dict[int, PlannerPOI] = {poi.id: poi for poi in must_visit_pois}
         current_lat = payload.origin_latitude
         current_lon = payload.origin_longitude
+        target_count = self.planner.suggest_target_poi_count(payload, len(must_visit_pois))
+        shortlist_size = min(self.MAX_SHORTLIST_SIZE, max(self.MIN_SHORTLIST_SIZE, target_count + 8))
+        candidates_per_strategy = min(
+            self.MAX_CANDIDATES_PER_STRATEGY,
+            max(self.MIN_CANDIDATES_PER_STRATEGY, ceil(target_count / 3)),
+        )
 
         for strategy in self.STRATEGIES:
             ranked = sorted(
@@ -158,16 +170,16 @@ class AIRouteGenerator:
                 key=lambda poi: self.planner._poi_utility(
                     poi=poi,
                     payload=payload,
-                    strategy=strategy,
+                    profile=strategy,
                     current_lat=current_lat,
                     current_lon=current_lon,
                 ),
                 reverse=True,
             )
-            for poi in ranked[: self.CANDIDATES_PER_STRATEGY]:
+            for poi in ranked[:candidates_per_strategy]:
                 selected[poi.id] = poi
 
-        for poi in candidates[: self.CANDIDATES_PER_STRATEGY]:
+        for poi in candidates[:candidates_per_strategy]:
             selected[poi.id] = poi
 
         ordered = list(selected.values())
@@ -175,13 +187,13 @@ class AIRouteGenerator:
             key=lambda poi: self.planner._poi_utility(
                 poi=poi,
                 payload=payload,
-                strategy=payload.preference_mode,
+                profile=payload.preference_mode,
                 current_lat=current_lat,
                 current_lon=current_lon,
             ),
             reverse=True,
         )
-        return ordered[: self.MAX_SHORTLIST_SIZE]
+        return ordered[:shortlist_size]
 
     def _materialize_route_options(
         self,
@@ -210,6 +222,12 @@ class AIRouteGenerator:
                 max_poi_count=payload.max_poi_count or 0,
             )
             selected = self._fit_sequence_to_constraints(payload, selected, must_visit_pois)
+            selected = self.planner._extend_route(
+                selected=selected,
+                candidates=candidates,
+                payload=payload,
+                strategy=item.strategy,
+            )
             if not selected:
                 continue
 
@@ -412,6 +430,7 @@ class AIRouteGenerator:
             "preferences": payload.preferences.model_dump(mode="json"),
             "special_interests": payload.special_interests,
             "max_poi_count": payload.max_poi_count,
+            "target_poi_count": self.planner.suggest_target_poi_count(payload, len(payload.must_visit_names)),
             "max_transit_minutes_per_leg": payload.max_transit_minutes_per_leg,
         }
 

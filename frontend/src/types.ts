@@ -18,7 +18,7 @@ export interface PlaceSuggestion {
 }
 
 export interface NavigationFormData {
-  district_query: string;
+  preferred_districts: string[];
   must_visit_names: string[];
   budget: number | null;
   travel_days: number | null;
@@ -69,6 +69,8 @@ export interface StopHighlight {
 }
 
 export interface RouteOption {
+  option_id: string;
+  option_label: string;
   title: string;
   strategy: string;
   route_style: string;
@@ -153,6 +155,7 @@ export interface RouteSegment {
 
 export interface MapRouteResponse {
   mode: "walking" | "driving" | "transfer";
+  requested_mode: "walking" | "driving" | "transfer" | null;
   summary: string;
   total_duration_minutes: number | null;
   total_distance_meters: number | null;

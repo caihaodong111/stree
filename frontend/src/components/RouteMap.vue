@@ -18,10 +18,19 @@ const routeResult = ref<MapRouteResponse | null>(null);
 const hasKey = computed(() => Boolean(import.meta.env.VITE_AMAP_KEY));
 const hasStops = computed(() => props.stops.length > 0);
 const modeLabel = computed(() => {
-  if (props.mode === "walking") {
+  const effectiveMode = routeResult.value?.mode ?? props.mode;
+  const requestedMode = routeResult.value?.requested_mode ?? props.mode;
+
+  if (requestedMode === "walking" && effectiveMode === "driving") {
+    return "步行已自动切换驾车";
+  }
+  if (requestedMode === "walking" && routeResult.value?.segments.some((segment) => segment.mode === "driving")) {
+    return "步行优先，超远段已驾车";
+  }
+  if (effectiveMode === "walking") {
     return "步行模式";
   }
-  if (props.mode === "driving") {
+  if (effectiveMode === "driving") {
     return "驾车模式";
   }
   return "公交模式";
@@ -91,6 +100,16 @@ function formatPrice(price: number | null) {
     return "0 元";
   }
   return `${price.toFixed(0)} 元`;
+}
+
+function polylineColor(mode: "walking" | "driving" | "transfer") {
+  if (mode === "walking") {
+    return "#165a4c";
+  }
+  if (mode === "driving") {
+    return "#be6a2f";
+  }
+  return "#2d61ba";
 }
 
 async function renderMap() {
@@ -175,12 +194,7 @@ async function renderMap() {
       .map((segment) => {
         return new AMap.Polyline({
           path: segment.polyline.map((point) => [point.longitude, point.latitude]),
-          strokeColor:
-            props.mode === "walking"
-              ? "#165a4c"
-              : props.mode === "driving"
-                ? "#be6a2f"
-                : "#2d61ba",
+          strokeColor: polylineColor(segment.mode),
           strokeWeight: 6,
           strokeOpacity: 0.92,
           showDir: true,

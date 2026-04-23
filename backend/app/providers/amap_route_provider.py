@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 
 import httpx
 from fastapi import HTTPException
 
 from app.core.config import settings
+
+
+logger = logging.getLogger("app.maps.amap")
 
 
 @dataclass(frozen=True)
@@ -81,7 +85,19 @@ class AMapRouteProvider:
 
         if payload.get("status") != "1":
             info = payload.get("info") or "AMap routing failed"
-            raise HTTPException(status_code=502, detail=f"AMap routing failed: {info}")
+            infocode = payload.get("infocode")
+            logger.warning(
+                "amap_route_failed path=%s origin=%s destination=%s info=%s infocode=%s",
+                path,
+                params["origin"],
+                params["destination"],
+                info,
+                infocode,
+            )
+            detail = f"AMap routing failed: {info}"
+            if infocode:
+                detail += f" (infocode={infocode})"
+            raise HTTPException(status_code=502, detail=detail)
         return payload
 
     def _parse_walking(self, payload: dict) -> SegmentRouteData:

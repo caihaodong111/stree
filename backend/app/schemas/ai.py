@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from app.schemas.recommendation import RecommendationRequest
 
@@ -20,7 +20,7 @@ class AIPlanningResponse(BaseModel):
 
 
 class AIRouteOptionAnalysis(BaseModel):
-    strategy: str
+    option_id: str = Field(validation_alias=AliasChoices("option_id", "strategy"))
     highlight_reason: str
 
 

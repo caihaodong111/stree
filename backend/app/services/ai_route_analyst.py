@@ -35,9 +35,9 @@ class AIRouteAnalyst:
             "如果信息不足，就明确使用“当前数据未提供”之类的表达。"
             "请始终返回一个 JSON 对象，不要输出 Markdown，不要输出额外说明。"
             'JSON 结构为：{"recommendation_summary":"",'
-            '"route_overrides":[{"strategy":"","highlight_reason":""}]}。'
+            '"route_overrides":[{"option_id":"","highlight_reason":""}]}。'
             "recommendation_summary 需要简洁、可信，突出这批候选路线的整体取舍。"
-            "route_overrides 中只允许覆盖已提供 strategy 的文案，highlight_reason 控制在一两句话。"
+            "route_overrides 中只允许覆盖已提供 option_id 的文案，highlight_reason 控制在一两句话。"
         )
 
         user_prompt = json.dumps(
@@ -58,6 +58,8 @@ class AIRouteAnalyst:
                 "missing_must_visit_names": missing_must_visit_names,
                 "route_options": [
                     {
+                        "option_id": route.option_id,
+                        "option_label": route.option_label,
                         "strategy": route.strategy,
                         "title": route.title,
                         "route_style": route.route_style,
@@ -92,11 +94,11 @@ class AIRouteAnalyst:
             logger.warning("analyze_routes validate_failed model=%s error=%s", self.client.model, exc)
             return None
 
-        valid_strategies = {route.strategy for route in route_options}
+        valid_option_ids = {route.option_id for route in route_options}
         result.route_overrides = [
             override
             for override in result.route_overrides
-            if override.strategy in valid_strategies and override.highlight_reason.strip()
+            if override.option_id in valid_option_ids and override.highlight_reason.strip()
         ]
         if not result.recommendation_summary.strip():
             logger.warning("analyze_routes empty_summary model=%s", self.client.model)

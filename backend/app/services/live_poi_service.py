@@ -20,7 +20,6 @@ class LivePOIService:
     BASE_URL = "https://restapi.amap.com"
     DEFAULT_RADIUS_METERS = 22000
     SEARCH_OFFSET = 10
-    MAX_CANDIDATES = 24
     MIN_LIVE_CANDIDATES = 8
 
     def __init__(self) -> None:
@@ -36,9 +35,10 @@ class LivePOIService:
     ) -> list[PlannerPOI]:
         cached_models = list(self.repository.list_all(db))
         cached_pois = self.planner.to_planner_pois(cached_models)
+        target_limit = self.planner.suggest_candidate_pool_size(payload, len(payload.must_visit_names))
         if not self.key:
-            logger.warning("list_candidates fallback reason=missing_amap_key cached=%s", len(cached_pois))
-            return cached_pois
+            logger.warning("list_candidates fallback reason=missing_amap_key cached=%s target_limit=%s", len(cached_pois), target_limit)
+            return cached_pois[:target_limit]
 
         live_items: list[dict] = []
         try:
@@ -66,21 +66,23 @@ class LivePOIService:
             live_items=live_items,
             cached_models=cached_models,
         )
+        live_candidates = self._top_up_from_cache(payload, live_candidates, cached_pois, target_limit)
         if len(live_candidates) < max(self.MIN_LIVE_CANDIDATES, len(payload.must_visit_names) + 3):
-            live_candidates = self._top_up_from_cache(payload, live_candidates, cached_pois)
+            live_candidates = self._top_up_from_cache(payload, live_candidates, cached_pois, target_limit)
 
         if not live_candidates:
             logger.warning("list_candidates fallback reason=empty_live_candidates cached=%s", len(cached_pois))
-            return cached_pois
+            return cached_pois[:target_limit]
 
         logger.info(
-            "list_candidates success live=%s cached=%s must_visit=%s districts=%s",
+            "list_candidates success live=%s cached=%s must_visit=%s districts=%s target_limit=%s",
             len(live_candidates),
             len(cached_pois),
             len(payload.must_visit_names),
             len(payload.preferred_districts),
+            target_limit,
         )
-        return live_candidates[: self.MAX_CANDIDATES]
+        return live_candidates[:target_limit]
 
     def _search_text(
         self,
@@ -207,7 +209,7 @@ class LivePOIService:
                 self.planner._poi_utility(
                     poi=poi,
                     payload=payload,
-                    strategy=payload.preference_mode,
+                    profile=payload.preference_mode,
                     current_lat=payload.origin_latitude,
                     current_lon=payload.origin_longitude,
                 ),
@@ -289,6 +291,7 @@ class LivePOIService:
         payload: RecommendationRequest,
         live_candidates: list[PlannerPOI],
         cached_pois: list[PlannerPOI],
+        target_limit: int,
     ) -> list[PlannerPOI]:
         existing_names = {self.planner._normalize_name(item.name) for item in live_candidates}
         supplemented = list(live_candidates)
@@ -303,13 +306,13 @@ class LivePOIService:
             key=lambda poi: self.planner._poi_utility(
                 poi=poi,
                 payload=payload,
-                strategy=payload.preference_mode,
+                profile=payload.preference_mode,
                 current_lat=payload.origin_latitude,
                 current_lon=payload.origin_longitude,
             ),
             reverse=True,
         )
-        supplemented.extend(filtered_cache[: max(0, self.MAX_CANDIDATES - len(supplemented))])
+        supplemented.extend(filtered_cache[: max(0, target_limit - len(supplemented))])
         return supplemented
 
     def _build_tags(self, raw_type: str, district: str) -> list[str]:

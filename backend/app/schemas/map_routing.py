@@ -33,6 +33,7 @@ class RouteSegment(BaseModel):
 
 class MapRouteResponse(BaseModel):
     mode: str
+    requested_mode: str | None = None
     summary: str
     total_duration_minutes: int | None = None
     total_distance_meters: int | None = None

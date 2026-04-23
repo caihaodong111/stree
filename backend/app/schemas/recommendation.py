@@ -75,6 +75,8 @@ class StopHighlight(BaseModel):
 
 
 class RouteOption(BaseModel):
+    option_id: str
+    option_label: str
     title: str
     strategy: str
     route_style: str

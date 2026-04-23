@@ -11,16 +11,6 @@ const props = defineProps<{
   selected?: boolean;
 }>();
 
-function strategyLabel(strategy: string) {
-  if (strategy === "time_first") {
-    return "时间优先";
-  }
-  if (strategy === "richness_first") {
-    return "丰富度优先";
-  }
-  return "均衡推荐";
-}
-
 function stopPreview(route: RouteOption) {
   return route.pois.slice(0, 3).map((poi) => poi.name).join(" · ");
 }
@@ -31,7 +21,7 @@ function stopPreview(route: RouteOption) {
     <div class="route-card-head">
       <span class="route-card-badge">
         <AppIcon name="briefcase" />
-        {{ strategyLabel(route.strategy) }}
+        {{ route.option_label }}
       </span>
       <span class="route-card-metric">
         <AppIcon name="route" />
@@ -42,7 +32,6 @@ function stopPreview(route: RouteOption) {
       <strong>{{ route.title }}</strong>
       <span class="route-card-score">Score {{ route.score }}</span>
     </div>
-    <span class="route-card-subtitle">{{ route.route_style }}</span>
     <p class="route-card-copy">{{ route.highlight_reason }}</p>
     <div class="route-card-quote">
       <div class="route-card-quote-head">
