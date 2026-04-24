@@ -635,6 +635,11 @@ class BeijingRoutePlanner:
                     poi_name=poi.name,
                     stay_hours=round(stay_minutes / 60, 1),
                     transit_minutes_from_previous=transit_minutes,
+                    item_type="poi",
+                    district=poi.district,
+                    latitude=poi.latitude,
+                    longitude=poi.longitude,
+                    reference_price=poi.ticket_price,
                 )
             )
 

@@ -36,13 +36,24 @@ const routeGenerationSource = ref<"ai_generated" | "rule_fallback" | "">("");
 const routeGenerationNote = ref("");
 
 const routeStops = computed<LocationPoint[]>(() => {
-  return (
-    recommendedRoute.value?.pois.map((poi) => ({
-      name: poi.name,
-      latitude: poi.latitude,
-      longitude: poi.longitude
-    })) ?? []
-  );
+  const itinerary = recommendedRoute.value?.itinerary ?? [];
+  const stops = itinerary
+    .filter((item) => item.latitude != null && item.longitude != null)
+    .map((item) => ({
+      name: item.poi_name,
+      latitude: Number(item.latitude),
+      longitude: Number(item.longitude)
+    }));
+
+  if (stops.length) {
+    return stops;
+  }
+
+  return recommendedRoute.value?.pois.map((poi) => ({
+    name: poi.name,
+    latitude: poi.latitude,
+    longitude: poi.longitude
+  })) ?? [];
 });
 
 const stopHighlights = computed(() => recommendedRoute.value?.stop_highlights ?? []);
@@ -115,8 +126,8 @@ const routeStats = computed(() => {
     {
       icon: "wallet" as const,
       label: "预计预算",
-      value: `${recommendedRoute.value.total_budget} 元`,
-      hint: "含门票、餐饮与交通估算",
+      value: `${recommendedRoute.value.total_budget_with_hotel ?? recommendedRoute.value.total_budget} 元`,
+      hint: recommendedRoute.value.estimated_accommodation_budget > 0 ? "含门票、餐饮、交通与住宿估算" : "含门票、餐饮与交通估算",
       chips: [] as string[],
       extraCount: 0
     },
@@ -139,8 +150,10 @@ const routeStats = computed(() => {
     {
       icon: "waypoint" as const,
       label: "推荐站点",
-      value: `${recommendedRoute.value.pois.length} 个`,
-      hint: "已含必去点与顺路补点",
+      value: recommendedRoute.value.estimated_accommodation_budget > 0
+        ? `${recommendedRoute.value.pois.length} 景点 / ${(recommendedRoute.value.recommended_hotels ?? []).length} 晚住宿`
+        : `${recommendedRoute.value.pois.length} 个`,
+      hint: recommendedRoute.value.estimated_accommodation_budget > 0 ? "景点与每晚住宿已一起考虑" : "已含必去点与顺路补点",
       chips: stationPreview,
       extraCount: remainingStationCount
     }
@@ -275,6 +288,13 @@ const itineraryDays = computed(() => {
 
 function formatStayHours(hours: number): string {
   return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+}
+
+function formatReferencePrice(price: number | null) {
+  if (price == null) {
+    return "价格待补充";
+  }
+  return `参考价 ${price} 元`;
 }
 
 async function locateOrigin() {
@@ -547,7 +567,7 @@ onMounted(() => {
             <div>
               <span class="section-kicker">建议时段</span>
               <strong>{{ recommendedRoute.title }}</strong>
-              <p>按每天的时间顺序查看停留地点和站点间接驳时间。</p>
+              <p>按每天的时间顺序查看停留地点、住宿位置和站点间接驳时间。</p>
             </div>
           </div>
 
@@ -560,10 +580,13 @@ onMounted(() => {
 
               <div class="itinerary-day-track" :aria-label="`Day ${day.dayIndex} 行程时间线`">
                 <template v-for="(item, index) in day.items" :key="`${day.dayIndex}-${item.poi_name}-${item.start_time}`">
-                  <article class="itinerary-stop-card">
+                  <article :class="['itinerary-stop-card', { 'itinerary-stop-card-hotel': item.item_type === 'hotel' }]">
                     <strong>{{ item.start_time }} - {{ item.end_time }}</strong>
                     <span class="itinerary-stop-name">{{ item.poi_name }}</span>
-                    <small>停留 {{ formatStayHours(item.stay_hours) }} 小时</small>
+                    <small v-if="item.item_type === 'hotel'">
+                      住宿位置 · {{ formatReferencePrice(item.reference_price) }}
+                    </small>
+                    <small v-else>停留 {{ formatStayHours(item.stay_hours) }} 小时</small>
                   </article>
 
                   <div v-if="index < day.items.length - 1" class="itinerary-leg">

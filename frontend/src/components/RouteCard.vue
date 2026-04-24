@@ -14,6 +14,13 @@ const props = defineProps<{
 function stopPreview(route: RouteOption) {
   return route.pois.slice(0, 3).map((poi) => poi.name).join(" · ");
 }
+
+function budgetLabel(route: RouteOption) {
+  if (route.total_budget_with_hotel != null && route.estimated_accommodation_budget > 0) {
+    return `${route.total_budget_with_hotel} 元`;
+  }
+  return `${route.total_budget} 元`;
+}
 </script>
 
 <template>
@@ -40,7 +47,11 @@ function stopPreview(route: RouteOption) {
       </div>
       <div class="route-card-quote-row">
         <span><AppIcon name="wallet" />预计花费</span>
-        <strong>{{ route.total_budget }} 元</strong>
+        <strong>{{ budgetLabel(route) }}</strong>
+      </div>
+      <div v-if="route.estimated_accommodation_budget > 0" class="route-card-quote-row">
+        <span><AppIcon name="briefcase" />住宿参考</span>
+        <strong>{{ route.estimated_accommodation_budget }} 元</strong>
       </div>
       <div class="route-card-quote-row">
         <span><AppIcon name="clock" />时间成本</span>

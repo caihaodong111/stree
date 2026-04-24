@@ -1046,6 +1046,12 @@ select:focus {
   flex-shrink: 0;
 }
 
+.itinerary-stop-card-hotel {
+  border-color: rgba(184, 120, 42, 0.18);
+  background: linear-gradient(180deg, rgba(255, 250, 241, 0.98), rgba(255, 255, 255, 0.94));
+  box-shadow: 0 16px 32px rgba(110, 74, 21, 0.08);
+}
+
 .itinerary-stop-name {
   color: #22352e;
   font-size: 1rem;

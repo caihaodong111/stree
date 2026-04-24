@@ -65,6 +65,24 @@ class ItineraryItem(BaseModel):
     poi_name: str
     stay_hours: float
     transit_minutes_from_previous: int
+    item_type: str = Field(default="poi", description="poi | hotel")
+    district: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    reference_price: float | None = None
+
+
+class HotelRecommendation(BaseModel):
+    day_index: int
+    hotel_id: int
+    hotel_name: str
+    district: str
+    address: str
+    latitude: float
+    longitude: float
+    reference_price: float | None = None
+    nights: int = 1
+    reason: str
 
 
 class StopHighlight(BaseModel):
@@ -87,6 +105,9 @@ class RouteOption(BaseModel):
     highlight_reason: str
     pois: list[POIOut]
     itinerary: list[ItineraryItem]
+    recommended_hotels: list[HotelRecommendation] = Field(default_factory=list)
+    estimated_accommodation_budget: float = 0
+    total_budget_with_hotel: float | None = None
     stop_highlights: list[StopHighlight] = Field(default_factory=list)
 
 

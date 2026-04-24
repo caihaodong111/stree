@@ -81,6 +81,9 @@ export interface RouteOption {
   highlight_reason: string;
   pois: POIOut[];
   itinerary: ItineraryItem[];
+  recommended_hotels: HotelRecommendation[];
+  estimated_accommodation_budget: number;
+  total_budget_with_hotel: number | null;
   stop_highlights: StopHighlight[];
 }
 
@@ -91,6 +94,24 @@ export interface ItineraryItem {
   poi_name: string;
   stay_hours: number;
   transit_minutes_from_previous: number;
+  item_type: "poi" | "hotel";
+  district: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  reference_price: number | null;
+}
+
+export interface HotelRecommendation {
+  day_index: number;
+  hotel_id: number;
+  hotel_name: string;
+  district: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  reference_price: number | null;
+  nights: number;
+  reason: string;
 }
 
 export interface RecommendationResponse {
@@ -160,5 +181,6 @@ export interface MapRouteResponse {
   total_duration_minutes: number | null;
   total_distance_meters: number | null;
   total_price: number | null;
+  render_source?: "amap-js" | "backend";
   segments: RouteSegment[];
 }

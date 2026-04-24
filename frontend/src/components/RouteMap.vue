@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { planStopsRoute } from "../api/client";
 import AppIcon from "./AppIcon.vue";
 import { loadAmap } from "../lib/amap";
+import { planStopsRouteWithAmap } from "../lib/amapRoutePlanner";
 import type { LocationPoint, MapRouteResponse } from "../types";
 
 const props = defineProps<{
@@ -40,6 +41,7 @@ let mapInstance: any = null;
 let renderVersion = 0;
 let markers: any[] = [];
 let routePolylines: any[] = [];
+let routeServices: any[] = [];
 
 type Coordinate = [number, number];
 
@@ -63,6 +65,13 @@ function createStopMarker(AMap: any, name: string, position: Coordinate, index: 
 }
 
 function clearOverlays() {
+  routeServices.forEach((service) => {
+    if (typeof service?.clear === "function") {
+      service.clear();
+    }
+  });
+  routeServices = [];
+
   if (mapInstance && markers.length) {
     mapInstance.remove(markers);
   }
@@ -116,6 +125,17 @@ async function renderMap() {
   const currentVersion = ++renderVersion;
   loading.value = true;
   error.value = "";
+  const payload = {
+    mode: props.mode,
+    origin_name: props.origin.name,
+    origin_longitude: props.origin.longitude,
+    origin_latitude: props.origin.latitude,
+    stops: props.stops.map((stop) => ({
+      name: stop.name,
+      longitude: stop.longitude,
+      latitude: stop.latitude
+    }))
+  };
 
   if (!hasStops.value) {
     routeResult.value = null;
@@ -126,93 +146,104 @@ async function renderMap() {
   }
 
   try {
-    routeResult.value = await planStopsRoute({
-      mode: props.mode,
-      origin_name: props.origin.name,
-      origin_longitude: props.origin.longitude,
-      origin_latitude: props.origin.latitude,
-      stops: props.stops.map((stop) => ({
-        name: stop.name,
-        longitude: stop.longitude,
-        latitude: stop.latitude
-      }))
-    });
+    if (mapElement.value && hasKey.value) {
+      const AMap = await loadAmap([
+        "AMap.Scale",
+        "AMap.ToolBar",
+        "AMap.Walking",
+        "AMap.Driving",
+        "AMap.Transfer"
+      ]);
+
+      if (currentVersion !== renderVersion) {
+        return;
+      }
+
+      destroyMap();
+
+      mapInstance = new AMap.Map(mapElement.value, {
+        viewMode: "2D",
+        zoom: 12,
+        center: [props.origin.longitude, props.origin.latitude],
+        mapStyle: "amap://styles/whitesmoke"
+      });
+
+      mapInstance.addControl(new AMap.Scale());
+      mapInstance.addControl(new AMap.ToolBar({ position: "RB" }));
+
+      markers = [createOriginMarker(AMap, [props.origin.longitude, props.origin.latitude])];
+
+      props.stops.forEach((stop, index) => {
+        markers.push(
+          createStopMarker(
+            AMap,
+            stop.name,
+            [stop.longitude, stop.latitude],
+            index + 1
+          )
+        );
+      });
+
+      mapInstance.add(markers);
+
+      try {
+        const planned = await planStopsRouteWithAmap({
+          AMap,
+          map: mapInstance,
+          origin: props.origin,
+          stops: props.stops,
+          mode: props.mode
+        });
+
+        if (currentVersion !== renderVersion) {
+          return;
+        }
+
+        routeServices = planned.services;
+        routeResult.value = planned.response;
+        mapInstance.setFitView(undefined, false, [60, 60, 60, 60]);
+        return;
+      } catch (plannerError) {
+        routeServices.forEach((service) => {
+          if (typeof service?.clear === "function") {
+            service.clear();
+          }
+        });
+        routeServices = [];
+        routeResult.value = await planStopsRoute(payload);
+
+        routePolylines = (routeResult.value?.segments ?? [])
+          .filter((segment) => segment.polyline.length > 1)
+          .map((segment) => {
+            return new AMap.Polyline({
+              path: segment.polyline.map((point) => [point.longitude, point.latitude]),
+              strokeColor: polylineColor(segment.mode),
+              strokeWeight: 6,
+              strokeOpacity: 0.92,
+              showDir: true,
+              lineJoin: "round",
+              lineCap: "round",
+              isOutline: true,
+              outlineColor: "rgba(255,255,255,0.86)",
+              borderWeight: 2
+            });
+          });
+
+        if (routePolylines.length) {
+          mapInstance.add(routePolylines);
+          mapInstance.setFitView([...markers, ...routePolylines], false, [60, 60, 60, 60]);
+        } else {
+          mapInstance.setFitView(markers, false, [80, 80, 80, 80]);
+        }
+
+        return;
+      }
+    }
+
+    routeResult.value = await planStopsRoute(payload);
   } catch (err) {
     routeResult.value = null;
     destroyMap();
-    loading.value = false;
-    error.value = err instanceof Error ? err.message : "路线测算失败。";
-    return;
-  }
-
-  if (currentVersion !== renderVersion) {
-    return;
-  }
-
-  if (!mapElement.value || !hasKey.value) {
-    destroyMap();
-    loading.value = false;
-    return;
-  }
-
-  try {
-    const AMap = await loadAmap(["AMap.Scale", "AMap.ToolBar"]);
-
-    if (currentVersion !== renderVersion) {
-      return;
-    }
-
-    destroyMap();
-
-    mapInstance = new AMap.Map(mapElement.value, {
-      viewMode: "2D",
-      zoom: 12,
-      center: [props.origin.longitude, props.origin.latitude],
-      mapStyle: "amap://styles/whitesmoke"
-    });
-
-    mapInstance.addControl(new AMap.Scale());
-    mapInstance.addControl(new AMap.ToolBar({ position: "RB" }));
-
-    markers = [createOriginMarker(AMap, [props.origin.longitude, props.origin.latitude])];
-
-    props.stops.forEach((stop, index) => {
-      markers.push(
-        createStopMarker(
-          AMap,
-          stop.name,
-          [stop.longitude, stop.latitude],
-          index + 1
-        )
-      );
-    });
-
-    mapInstance.add(markers);
-
-    routePolylines = (routeResult.value?.segments ?? [])
-      .filter((segment) => segment.polyline.length > 1)
-      .map((segment) => {
-        return new AMap.Polyline({
-          path: segment.polyline.map((point) => [point.longitude, point.latitude]),
-          strokeColor: polylineColor(segment.mode),
-          strokeWeight: 6,
-          strokeOpacity: 0.92,
-          showDir: true,
-          lineJoin: "round",
-          lineCap: "round",
-          isOutline: true,
-          outlineColor: "rgba(255,255,255,0.86)",
-          borderWeight: 2
-        });
-      });
-
-    if (routePolylines.length) {
-      mapInstance.add(routePolylines);
-      mapInstance.setFitView([...markers, ...routePolylines], false, [60, 60, 60, 60]);
-    } else {
-      mapInstance.setFitView(markers, false, [80, 80, 80, 80]);
-    }
-  } catch (err) {
     error.value = err instanceof Error ? err.message : "地图渲染失败。";
   } finally {
     loading.value = false;

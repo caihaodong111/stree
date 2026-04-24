@@ -1,5 +1,7 @@
 from app.core.database import Base, engine
-from app.models import poi, route_plan  # noqa: F401
+import app.models.hotel  # noqa: F401
+import app.models.poi  # noqa: F401
+import app.models.route_plan  # noqa: F401
 
 
 def main() -> None:
