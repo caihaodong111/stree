@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+backend/.venv/
+backend/browser_profiles/
+
+frontend/dist/
