@@ -1,0 +1,36 @@
+{
+  "name": "stree",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w packages/shared && npm run build -w backend && npm run build -w frontend",
+    "typecheck": "npm run typecheck -w packages/shared && npm run typecheck -w backend && npm run typecheck -w frontend",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "start": "npm run start -w backend",
+    "db:setup": "npm run db:setup -w backend",
+    "check:services": "npm run check:services -w backend",
+    "predev": "npm run build -w packages/shared",
+    "pretest": "npm run build -w packages/shared",
+    "predb:setup": "npm run build -w packages/shared",
+    "precheck:services": "npm run build -w packages/shared",
+    "format": "prettier --write \"{backend,frontend,packages,tests}/**/*.{ts,tsx,css}\" \"*.{ts,json,md}\""
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "concurrently": "^9.2.1",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

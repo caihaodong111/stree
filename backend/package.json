@@ -1,0 +1,28 @@
+{
+  "name": "@stree/api",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "db:setup": "tsx src/scripts/db-setup.ts",
+    "check:services": "tsx src/scripts/check-services.ts"
+  },
+  "dependencies": {
+    "@stree/shared": "*",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/static": "^10.1.6",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.4",
+    "fastify": "^5.12.5",
+    "mysql2": "^3.24.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "tsx": "^4.23.15"
+  }
+}

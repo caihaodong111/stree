@@ -1,103 +1,51 @@
 declare global {
   interface Window {
     AMap?: any;
-    _AMapSecurityConfig?: {
-      securityJsCode?: string;
-    };
+    _AMapSecurityConfig?: { securityJsCode?: string };
     __streeAmapPromise__?: Promise<any>;
   }
 }
 
-const AMAP_SCRIPT_TIMEOUT_MS = 5000;
-const AMAP_GEOCODE_TIMEOUT_MS = 3500;
-
-export async function loadAmap(pluginNames: string[] = []): Promise<any> {
-  if (window.AMap) {
-    await loadPlugins(window.AMap, pluginNames);
-    return window.AMap;
-  }
-
-  if (!window.__streeAmapPromise__) {
-    const amapKey = import.meta.env.VITE_AMAP_KEY;
+export async function loadAmap(plugins: string[] = []): Promise<any> {
+  if (!window.AMap && !window.__streeAmapPromise__) {
+    const key = import.meta.env.VITE_AMAP_KEY;
+    if (!key) throw new Error('请在 frontend/.env.local 配置高德 JS API Key。');
     const securityCode = import.meta.env.VITE_AMAP_SECURITY_CODE;
-
-    if (!amapKey) {
-      throw new Error("缺少高德地图 Key，请配置 VITE_AMAP_KEY。");
-    }
-
-    if (securityCode) {
-      window._AMapSecurityConfig = {
-        securityJsCode: securityCode
-      };
-    }
-
+    if (securityCode) window._AMapSecurityConfig = { securityJsCode: securityCode };
     window.__streeAmapPromise__ = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      const timer = window.setTimeout(() => {
-        reject(new Error("高德地图脚本加载超时。"));
-      }, AMAP_SCRIPT_TIMEOUT_MS);
-      script.src = `https://webapi.amap.com/maps?v=2.0&key=${amapKey}&plugin=AMap.Scale,AMap.ToolBar,AMap.Geocoder`;
+      const script = document.createElement('script');
+      const fail = (message: string) => {
+        window.clearTimeout(timer);
+        script.remove();
+        window.__streeAmapPromise__ = undefined;
+        reject(new Error(message));
+      };
+      const timer = window.setTimeout(
+        () => fail('高德地图加载超时，请检查网络后重新加载。'),
+        15000,
+      );
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(key)}`;
       script.async = true;
       script.onload = () => {
         window.clearTimeout(timer);
-        if (window.AMap) {
-          resolve(window.AMap);
-          return;
-        }
-        reject(new Error("高德地图脚本加载完成，但 AMap 对象不可用。"));
+        if (window.AMap) resolve(window.AMap);
+        else fail('高德地图暂时不可用，请检查 JS API Key 和域名白名单。');
       };
-      script.onerror = () => {
-        window.clearTimeout(timer);
-        reject(new Error("高德地图脚本加载失败。"));
-      };
+      script.onerror = () => fail('高德地图加载失败，请检查网络后重试。');
       document.head.appendChild(script);
     });
   }
-
-  const AMap = await window.__streeAmapPromise__;
-  await loadPlugins(AMap, pluginNames);
-  return AMap;
-}
-
-function loadPlugins(AMap: any, pluginNames: string[]): Promise<void> {
-  if (!pluginNames.length) {
-    return Promise.resolve();
-  }
-
-  return new Promise((resolve) => {
-    AMap.plugin(pluginNames, () => resolve());
-  });
-}
-
-export async function geocodePlace(keyword: string): Promise<{ name: string; latitude: number; longitude: number }> {
-  const query = keyword.trim();
-  if (!query) {
-    throw new Error("请输入地点。");
-  }
-
-  const AMap = await loadAmap(["AMap.Geocoder"]);
-
-  return new Promise((resolve, reject) => {
-    const geocoder = new AMap.Geocoder({
-      city: "全国"
-    });
-    const timer = window.setTimeout(() => {
-      reject(new Error(`地点识别超时：${query}`));
-    }, AMAP_GEOCODE_TIMEOUT_MS);
-
-    geocoder.getLocation(query, (status: string, result: any) => {
-      window.clearTimeout(timer);
-      if (status !== "complete" || result.info !== "OK" || !result.geocodes?.length) {
-        reject(new Error(`无法识别地点：${query}`));
-        return;
-      }
-
-      const first = result.geocodes[0];
-      resolve({
-        name: first.formattedAddress || query,
-        longitude: Number(first.location.lng),
-        latitude: Number(first.location.lat)
+  const AMap = window.AMap ?? (await window.__streeAmapPromise__);
+  if (plugins.length)
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(
+        () => reject(new Error('高德地图组件加载超时，请重试。')),
+        15000,
+      );
+      AMap.plugin(plugins, () => {
+        window.clearTimeout(timer);
+        resolve();
       });
     });
-  });
+  return AMap;
 }
