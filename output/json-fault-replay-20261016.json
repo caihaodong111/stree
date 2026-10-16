@@ -1,0 +1,26 @@
+{
+  "sourceRunId": "8a6c6f12-ea06-4da5-a4df-afb753d2533c",
+  "replayRunId": "f243abc2-6e7c-440f-a69c-4e76b7e806b2",
+  "replayedOriginalFault": true,
+  "actualModelRepairRequests": 1,
+  "valid": true,
+  "days": [
+    1,
+    1
+  ],
+  "toolCalls": 0,
+  "recoveryEvents": [
+    {
+      "id": "4511224c-87c9-4596-92d9-a2536d2d384d",
+      "runId": "f243abc2-6e7c-440f-a69c-4e76b7e806b2",
+      "sequence": 2,
+      "type": "output_recovery",
+      "payload": {
+        "attempt": 1,
+        "reason": "JSON 语法错误：检查引号、逗号和对象/数组的闭合括号。"
+      },
+      "createdAt": "2026-10-16T09:23:54.935Z"
+    }
+  ],
+  "durationSeconds": 231
+}

@@ -1,4 +1,4 @@
-import type { Region } from '@stree/shared';
+import type { Coordinate, LocatedRegion, Region } from '@stree/shared';
 import { AmapService, parsePolyline } from './amap.js';
 import { AppError } from '../errors.js';
 
@@ -54,6 +54,23 @@ export function belongsToCity(adcode: string, cityCode: string): boolean {
 export class RegionService {
   private cache = new Map<string, Region[]>();
   constructor(private amap: AmapService) {}
+  async locate(position: Coordinate): Promise<LocatedRegion> {
+    const adcode = await this.amap.locateDistrict(position);
+    return this.locateByAdcode(adcode);
+  }
+  async locateByAdcode(adcode: string): Promise<LocatedRegion> {
+    const province = provinces.find((item) => item.adcode === `${adcode.slice(0, 2)}0000`);
+    if (province) {
+      const cities = await this.cities(province.adcode);
+      const city = cities.find((item) => belongsToCity(adcode, item.adcode));
+      if (city) return { province, city };
+    }
+    throw new AppError(
+      '当前位置不在可用的城市目录中，请手动选择目的地。',
+      422,
+      'LOCATION_UNAVAILABLE',
+    );
+  }
   async cities(provinceCode: string): Promise<Region[]> {
     const province = provinces.find((p) => p.adcode === provinceCode);
     if (!province) throw new AppError('请选择有效的省份。');

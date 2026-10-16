@@ -17,4 +17,7 @@ playwright-report/
 test-results/
 coverage/
 *.log
+deploy/backend.env
+deploy/frontend.env
+deploy/runtime/
 backend/travel_assistant.db

@@ -1,0 +1,15 @@
+.git
+.idea
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/.runtime
+deploy
+output
+test-results
+playwright-report
+coverage
+*.log
+.DS_Store
+**/._*

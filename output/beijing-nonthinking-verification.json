@@ -1,0 +1,32 @@
+{
+  "test": "大同绿城叠翠园20栋出发，北京3天",
+  "status": "completed",
+  "jobId": "6062ae95-8681-48a4-a6af-fc27a346757c",
+  "tripId": "625d25d5-91b7-4825-b672-3a4474a4778f",
+  "model": "qwen3.8-flash-next-iq3_s",
+  "elapsedSeconds": 59.2,
+  "modelCalls": 6,
+  "everyRequestDisablesThinking": true,
+  "origin": {
+    "id": "B0FFF7BE74",
+    "name": "绿城·叠翠园20栋",
+    "adcode": "140213",
+    "location": {
+      "latitude": 40.131706,
+      "longitude": 113.311798
+    }
+  },
+  "routes": 1,
+  "days": 3,
+  "firstArrival": "16:00",
+  "databaseFailureObserved": {
+    "code": "ETIMEDOUT",
+    "phase": "acquire",
+    "elapsedMs": 3003,
+    "sqlHadStarted": false
+  },
+  "checks": {
+    "testsPassed": 147,
+    "build": "passed"
+  }
+}

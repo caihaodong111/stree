@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-10-16T01:39:26.081815+00:00",
+  "provider": "qwen",
+  "model": "qwen3.8-flash-next-iq3_s",
+  "credentialUpdate": {
+    "success": true,
+    "method": "running-app-api",
+    "fileMode": "0600",
+    "defaultSelectionChanged": false
+  },
+  "basicModelCall": {
+    "status": 200,
+    "success": true
+  },
+  "toolCalling": {
+    "success": true,
+    "validSearchArguments": true,
+    "actualSearchSourcesReturned": true
+  },
+  "answerWithSources": {
+    "observedSuccess": true,
+    "autonomousSearchCallsInSuccessfulRun": 3,
+    "repeatability": "unstable; subsequent runs repeated searches without returning a final answer"
+  },
+  "fullPlan": {
+    "success": false,
+    "status": "stopped-diagnostic",
+    "observedAtLeastToolCalls": 50,
+    "reason": "Repeated route measurements; final itinerary was not returned before diagnostic was stopped"
+  },
+  "sourceCoverage": {
+    "generalTravelSources": 8,
+    "xiaohongshuDomainMatches": 0,
+    "douyinDomainMatches": 0
+  },
+  "changes": [
+    "Added explicit research-completion guidance to planning and verification prompts"
+  ],
+  "checks": {
+    "backendBuild": "passed",
+    "plannerTestsPassed": 16
+  }
+}

@@ -1,0 +1,593 @@
+{
+  "checkedAt": "2026-10-16T08:34:45.636Z",
+  "base": "http://115.190.55.138",
+  "jobId": "93fec6e0-ade5-43ca-8654-f808e23ea7cd",
+  "tripId": "8077c896-d09b-4b8e-8ca5-0921a51f1cb4",
+  "model": "Qwen/Qwen3.8-27B",
+  "engine": "custom-provider",
+  "routes": [
+    {
+      "title": "杭州西湖周边轻松漫步路线",
+      "stops": [
+        "杭州西湖风景名胜区-湖滨公园",
+        "杭州西湖风景名胜区-白堤"
+      ]
+    }
+  ],
+  "research": {
+    "status": "completed",
+    "sources": [
+      {
+        "url": "https://baike.baidu.com/item/%E6%9D%AD%E5%B7%9E%E5%B8%82/200167",
+        "title": "杭州市_百度百科",
+        "snippet": "杭州市（Hangzhou City），简称“杭”，浙江省辖地级市，杭州是浙江省省会和经济、文化、科教中心，长江三角洲中心城市，重要的 …",
+        "query": "杭州西湖附近 步行 一日游 轻松 攻略 2026",
+        "retrievedAt": "2026-10-16T08:30:23.419Z"
+      },
+      {
+        "url": "https://baike.baidu.com/item/%e8%a5%bf%e6%b9%96/4668821",
+        "title": "西湖（中国浙江省杭州市境内湖泊、江南三大名湖之一 ...",
+        "snippet": "2011年6月24日 · 西湖是一座设备齐全、管理完善的灌溉济运水库，通过河渠和闸门，为杭州市区及周边农田提供了充足的水源。 西 …",
+        "query": "西湖 湖滨公园 推荐 步道 建议",
+        "retrievedAt": "2026-10-16T08:31:48.081Z"
+      },
+      {
+        "url": "https://map.baidu.com/",
+        "title": "百度地图",
+        "snippet": "浏览地图、搜索地点、查询公交驾车线路、查看实时路况，您的出行指南、生活助手。提供地铁线路图浏览，乘车方案查询 ...",
+        "query": "杭州西湖附近 步行 一日游 轻松 攻略 2026",
+        "retrievedAt": "2026-10-16T08:30:23.419Z"
+      },
+      {
+        "url": "https://wgly.hangzhou.gov.cn/cn/whhz/sjyc/xh/index.html",
+        "title": "西湖 - Hangzhou",
+        "snippet": "2026年9月16日 · 访茶西湖 经典访茶游线 → 线路1： 梅家坞茶文化村--十里琅珰--三分叉--狮峰--龙井村--中国茶叶博物馆 → 线路2： …",
+        "query": "西湖 湖滨公园 推荐 步道 建议",
+        "retrievedAt": "2026-10-16T08:31:48.081Z"
+      },
+      {
+        "url": "https://www.hangzhou.gov.cn/",
+        "title": "杭州市人民政府门户网站",
+        "snippet": "8 小时之前 · =======市政府各部门网站======= 杭州市发展和改革委员会 杭州市经济和信息化局 杭州市教育局 杭州市科学技术局 …",
+        "query": "杭州西湖附近 步行 一日游 轻松 攻略 2026",
+        "retrievedAt": "2026-10-16T08:30:23.420Z"
+      },
+      {
+        "url": "https://zhuanlan.zhihu.com/p/25730451620",
+        "title": "西湖旅游攻略：必打卡十大景点排行榜，邂逅人间天堂的诗意 ...",
+        "snippet": "2025年2月24日 · “欲把西湖比西子，淡妆浓抹总相宜。 ” 西湖，这座位于杭州的璀璨明珠，以其如诗如画的湖光山色和深厚的文化底 …",
+        "query": "西湖 湖滨公园 推荐 步道 建议",
+        "retrievedAt": "2026-10-16T08:31:48.082Z"
+      },
+      {
+        "url": "https://zhuanlan.zhihu.com/p/150679193",
+        "title": "杭州不得不去的十个地方 - 知乎",
+        "snippet": "2020年7月15日 · 杭州不得不去的十个地方 上有天堂，下有苏杭，提起杭州，大家首先想到的就是西湖。 杭州除了美景也是浙江省的 …",
+        "query": "杭州西湖附近 步行 一日游 轻松 攻略 2026",
+        "retrievedAt": "2026-10-16T08:30:23.420Z"
+      },
+      {
+        "url": "https://baike.baidu.com/item/%E6%9D%AD%E5%B7%9E%E5%B8%82%E6%9D%AD%E5%B7%9E%E8%A5%BF%E6%B9%96%E9%A3%8E%E6%99%AF%E5%8C%BA/65000333",
+        "title": "杭州市杭州西湖风景区_百度百科",
+        "snippet": "2011年6月24日 · 2000多年前，吴山和宝石山之间泥沙淤积，形成沙嘴，后靠拢成为沙洲，形成内湖——西湖。 唐长庆二年（822 …",
+        "query": "西湖 湖滨公园 推荐 步道 建议",
+        "retrievedAt": "2026-10-16T08:31:48.082Z"
+      },
+      {
+        "url": "https://baike.baidu.com/item/%E5%B2%B3/34242",
+        "title": "岳（汉语文字）_百度百科",
+        "snippet": "岳（拼音：yuè）是汉语一级通用规范汉字（常用字）。 此字始见于《说文解字》小篆，另有学者认为此字在甲骨文中就已出现。 岳 …",
+        "query": "岳王庙 北山街 临湖 步道 建议",
+        "retrievedAt": "2026-10-16T08:31:48.037Z"
+      },
+      {
+        "url": "https://www.hanyuguoxue.com/zidian/zi-23731",
+        "title": "岳的意思,岳的解释,岳的拼音,岳的部首,岳的笔顺-汉语国学",
+        "snippet": "岳的拼音是yuè，岳字共8画，部首是山部，本页介绍岳字的意思，岳的详细解释，岳的读音、笔顺，还包括岳的翻译、输入法、异体 …",
+        "query": "岳王庙 北山街 临湖 步道 建议",
+        "retrievedAt": "2026-10-16T08:31:48.037Z"
+      },
+      {
+        "url": "https://zidian.gushici.net/8/5cb3.html",
+        "title": "岳怎么读_岳的拼音 - 新华字典",
+        "snippet": "2026年10月5日 · (3) 即东岳泰山、西岳华山、南岳衡山、北岳恒山、中岳嵩山。 又如:岳宗 (五岳之中的嵩山);岳帝 (东岳泰山之神、东 …",
+        "query": "岳王庙 北山街 临湖 步道 建议",
+        "retrievedAt": "2026-10-16T08:31:48.037Z"
+      },
+      {
+        "url": "https://www.hgcha.com/zidian/f19c945c.html",
+        "title": "《岳》的拼音,岳字的意思、组词、部首、笔画、笔顺 - 汉语查",
+        "snippet": "2 天之前 · 岳字的读音是yuè，上边一个丘下边一个山是什么字，岳的部首是山，岳的笔画一共8画，其中部外笔画5画，岳的五行属 …",
+        "query": "岳王庙 北山街 临湖 步道 建议",
+        "retrievedAt": "2026-10-16T08:31:48.037Z"
+      }
+    ],
+    "warnings": []
+  },
+  "callCount": 55,
+  "calls": [
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "web_search",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "web_search.http",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "web_search.http",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "search_places",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "search_places",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "search_places",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "search_places",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "web_search",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "web_search.http",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "web_search.http",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "tool",
+      "name": "measure_route",
+      "status": "completed"
+    },
+    {
+      "kind": "model",
+      "name": "chat/completions",
+      "status": "completed"
+    }
+  ],
+  "status": {
+    "codex": {
+      "available": false,
+      "authenticated": false,
+      "model": null
+    },
+    "model": {
+      "configured": true,
+      "provider": "siliconflow",
+      "model": "Qwen/Qwen3.8-27B"
+    },
+    "amap": {
+      "configured": true
+    },
+    "storage": {
+      "driver": "file",
+      "available": true
+    },
+    "webSearch": {
+      "enabled": true,
+      "configured": true,
+      "provider": "bing"
+    },
+    "version": "2.0.0"
+  },
+  "persistenceAfterRecreate": true,
+  "resultPage": {
+    "errors": [],
+    "mapRequests": [
+      {
+        "url": "https://webapi.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-service.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://restapi.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-service.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://webapi.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data5.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data3.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://custyle.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data2.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data2.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data5.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://o4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://o4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://o4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://o4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data1.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data5.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data1.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data3.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data3.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data2.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data2.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data2.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data2.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data5.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data3.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data5.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data4.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data3.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data5.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://jsapi-data1.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://webapi.amap.com",
+        "status": 302
+      },
+      {
+        "url": "https://mapplugin.amap.com",
+        "status": 200
+      },
+      {
+        "url": "https://restapi.amap.com",
+        "status": 200
+      }
+    ],
+    "mapStatus": {
+      "amapLoaded": true,
+      "mapCanvasCount": 1,
+      "body": "一点\n主要交通方式\n公共交通\n步行\n自驾\n骑行\n推荐顺路住宿\n多日行程，价格需确认\n03\n补充说明\n\n同行人、饮食偏好，或任何特别的期待。\n\n还有什么期待？\n48 / 2000\n浙江省 · 杭州市\n生成后可继续调整行程\n生成我的路线\n行程预览\n实时更新\n即将探索\n杭州市\n\n浙江省 · 2 天 1 晚\n\n出发日期\n日期待定\n每人预算\n¥ 1,500\n出行方式\n公共交通\n旅行节奏\n刚刚好\n城市漫步\n当地美食\n\n路线、交通与逐站攻略，\n一次规划，轻松出发。\n\n下一站灵感\n选一座喜欢的城\n杭州\n湖山之间\n成都\n慢一点也很好\n上海\n街角的另一面\n大理\n去有风的地方\n\n地点与导航数据由高德地图提供\n\nYOUR JOURNEY / 杭州市\n这座城，有了你的走法。\n\n为您规划了一条杭州西湖附近的轻松步行一日游路线。本路线从市中心出发，主要包含湖滨公园漫步和白堤赏景两个相邻的步行景点。全程以步行和公共交通为主，节奏舒缓，适合休闲游。\n\n导出攻略\n方案 01 · 推荐路线\n杭州西湖周边轻松漫步路线\n独自、情侣或家庭休闲出行，不喜欢暴走的用户。\n约 ¥160\n\n市中心出发 -> 湖滨公园 -> 白堤 -> 返程。全程步行+公共交通，两个相邻景点。\n\n¥160\n每人参考总预算\n11.0 km\n交通路线距离\n2.2 h\n累计交通时间\nDAY 01\n西湖漫步日\n交通路线\n高德地图提供\nDAY 01\n驾车\n公交 / 地铁\n步行\n骑行\n行程路段\n1 / 3\n1. 杭州市中心（可在表单指定出发地） → 杭州西湖风景名胜区-湖滨公园\n2. 杭州西湖风景名胜区-湖滨公园 → 杭州西湖风景名胜区-白堤\n3. 杭州西湖风景名胜区-白堤 → 杭州市中心（可在表单指定出发地）\n杭州市中心（可在表单指定出发地）\n杭州西湖风景名胜区-湖滨公园\n现在出发\n刷新\n1 条可选路线\n1小时23分钟\n方案 1\n解放东路辅路 → 清泰街辅路 → 开元路 → 西湖景区环湖绿道\n0元\n6.2公里\n详情\n\n切换交通方式仅用于查看，不改动行程时间与预算。\n\n起\n终\n1\n2\n500 米\n+\n-\n© 2026 AutoNavi - GS(2025)5996号\n查看全日路线\n步行\n选中路段 · 1 小时 23 分钟 · 6.2 公里\n在高德打开此路段\n每日行程\n路线攻略\n第 1 天\n西湖漫步日\n\nAI 建议 09:30 出发\n\n从市中心步行至西湖东北角的湖滨公园，感受湖畔风光，随后步行前往白堤游览，最后乘公共交通返回。\n\n01\n高德路线规划：解放东路辅路 → 清泰街辅路 → 开元路 → 西湖景区环湖绿道。 · 83 分钟 · 6.2 km\n10:53 — 12:00\n杭州西湖风景名胜区-湖滨公园\n\n位于西湖东北角，交通便利，是湖湾游赏的绝佳起点。\n\n上城区 · 龙井路1号杭州西湖风景名胜区内(东北角)\n这一站怎么玩\n02\n高德路线规划：沿西湖景区环湖绿道步行至白堤。 · 34 分钟 · 2.5 km\n12:34 — 13:30\n杭州西湖风景名胜区-白堤\n\n从湖滨公园沿绿道步行不久即可到达，是西湖十景之一，串联起西子湖与北山街。\n\n西湖区 · 西湖街道龙井路1号杭州西湖风景名胜区内(东北角)\n这一站怎么玩\n吃点当地的\n白堤附近有不少传统杭帮菜馆，如楼外楼（需排队，价格较高），或选择在周边商业街品尝特色小吃。\nTRAVEL BUDGET\n每一笔，都有数。\n约 ¥160\n\n每人 · 行程参考总费用\n\n门票参考\n¥0\n餐饮参考\n¥100\n住宿分摊参考\n¥0\nAI 参考交通费\n¥5\n路线时间、距离与各项费用由 AI 安排或估算，包含行程中已安排的出发路段；未安排的返程不计入预算。\n让它更像你的旅行。\n\n节奏慢一点、加一处景点，或换种走法，都可以继续调整。\n\n调整这份行程\n行程提醒\n出发路段步行时间较长（约83分钟），建议在天气适宜时出行或考虑部分路段打车。\n白堤为开放区域，无需门票，但节假日人流量大请注意安全。\n联网攻略来源\n\n本次规划检索到的资料；搜索摘录不代表已阅读全文或观看视频。\n\n查看 12 条来源\n\n路线、交通方式、时间与攻略由 AI 规划，地点和导航数据由高德地图提供。 规划模型：Qwen/Qwen3.8-27B。开放时间、预约与价格以官方当日信息为准。\n\nSTREE\n好路线，是旅行的开始。\n规划服务已就绪"
+    }
+  }
+}

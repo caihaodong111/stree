@@ -9,12 +9,19 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/main.js",
     "db:setup": "tsx src/scripts/db-setup.ts",
-    "check:services": "tsx src/scripts/check-services.ts"
+    "db:migrate": "tsx src/scripts/db-migrate.ts",
+    "db:ai-setup": "tsx src/scripts/db-ai-setup.ts",
+    "db:export-files": "tsx src/scripts/export-files.ts",
+    "check:services": "tsx src/scripts/check-services.ts",
+    "check:web-search": "tsx src/scripts/check-web-search.ts"
   },
   "dependencies": {
-    "@stree/shared": "*",
     "@fastify/cors": "^11.3.1",
     "@fastify/static": "^10.1.6",
+    "@stree/shared": "*",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "cheerio": "^1.2.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.5",

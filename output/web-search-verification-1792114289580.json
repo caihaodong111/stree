@@ -1,0 +1,91 @@
+{
+  "checkedAt": "2026-10-16T01:31:28.649Z",
+  "search": {
+    "enabled": true,
+    "configured": true,
+    "provider": "bing"
+  },
+  "coverage": [
+    {
+      "label": "普通攻略",
+      "query": "杭州 三日游 攻略",
+      "success": true,
+      "sourceCount": 8,
+      "matchingDomainCount": 8,
+      "sources": [
+        {
+          "url": "https://baike.baidu.com/item/%E6%9D%AD%E5%B7%9E%E5%B8%82/200167",
+          "title": "杭州市_百度百科",
+          "snippet": "杭州市（Hangzhou City），简称“杭”，浙江省辖地级市，杭州是浙江省省会和经济、文化、科教中心，长江三角洲中心城市，重要的 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:31:29.068Z"
+        },
+        {
+          "url": "https://www.hangzhou.gov.cn/",
+          "title": "杭州市人民政府门户网站",
+          "snippet": "1 天前 · 杭州市气象台10月15日19时50分发布的市区天气预报：今天夜里到明天上午阴有时有阵雨，明天下午阴到多云，部分城区有 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:31:29.069Z"
+        },
+        {
+          "url": "https://zhuanlan.zhihu.com/p/150679193",
+          "title": "杭州不得不去的十个地方 - 知乎",
+          "snippet": "2020年7月15日 · 杭州不得不去的十个地方 上有天堂，下有苏杭，提起杭州，大家首先想到的就是西湖。 杭州除了美景也是浙江省的 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:31:29.069Z"
+        },
+        {
+          "url": "https://zhuanlan.zhihu.com/p/1921591707402756574",
+          "title": "2025杭州旅游全攻略：一年去了5次杭州！全都是避坑大实话 ...",
+          "snippet": "2025年6月26日 · 哇，暑假来杭州玩真的太会挑时间了！ 西湖 的荷花全开了！ 杭州真的很好玩，消费也不高，但就是比较容易踩坑。 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:31:29.070Z"
+        },
+        {
+          "url": "https://www.sohu.com/a/811864015_122045638",
+          "title": "杭州最值得去的15个景点，去过8个以上，才算真正去过杭州",
+          "snippet": "2024年9月27日 · 此外，杭州还有如千岛湖、京杭大运河等自然景观，以及灵隐寺、宋城等富含历史文化底蕴的景点，为游客提供了丰 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:31:29.070Z"
+        },
+        {
+          "url": "https://www.chinahora.com/zh-CN/what-to-see-in-hangzhou-china/",
+          "title": "杭州必看景点：杭州十大最佳旅游景点 CHINAHORA",
+          "snippet": "杭州必看景点：杭州十大最佳旅游景点 如果您正在计划一次自发的旅行，杭州是您第一眼就会爱上的城市之一。 这里既有古代诗人笔 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:31:29.070Z"
+        },
+        {
+          "url": "https://www.hangzhou.com.cn/",
+          "title": "杭州网-杭州-新闻-门户-权威亲民-关注民生-国家重点新闻网站",
+          "snippet": "今晚雨水造访 周末杭州最高气温将冲到30℃ 十一假期后期以来，杭州持续晴好，气温舒适，度过了一段秋高气爽的稳定时光。 连晴 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:31:29.070Z"
+        },
+        {
+          "url": "https://www.ehangzhou.gov.cn/",
+          "title": "Hangzhou, China ( 浙江杭州) | Official site of Hangzhou, Zhejiang …",
+          "snippet": "The official website for Hangzhou, Zhejiang province, China,（中国浙江杭州） covering all local news, policies, cultural activities, …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:31:29.070Z"
+        }
+      ]
+    },
+    {
+      "label": "小红书",
+      "query": "site:xiaohongshu.com 杭州 西湖 旅游 攻略",
+      "success": true,
+      "sourceCount": 0,
+      "matchingDomainCount": 0,
+      "sources": []
+    },
+    {
+      "label": "抖音",
+      "query": "site:douyin.com 杭州 西湖 旅游 攻略",
+      "success": true,
+      "sourceCount": 0,
+      "matchingDomainCount": 0,
+      "sources": []
+    }
+  ]
+}

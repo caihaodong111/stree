@@ -1,0 +1,38 @@
+name: stree
+services:
+  app:
+    image: ${STREE_IMAGE:-stree:latest}
+    build:
+      context: .
+      secrets:
+        - frontend_env
+    init: true
+    restart: unless-stopped
+    ports:
+      - '${STREE_HTTP_PORT:-80}:8000'
+    env_file:
+      - ./deploy/backend.env
+    environment:
+      NODE_ENV: production
+      APP_HOST: 0.0.0.0
+      APP_PORT: '8000'
+      STORAGE_DRIVER: file
+      SETTINGS_ENABLED: 'false'
+    volumes:
+      - ./deploy/runtime:/app/backend/.runtime
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+secrets:
+  frontend_env:
+    file: ./deploy/frontend.env

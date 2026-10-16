@@ -1,0 +1,95 @@
+{
+  "checkedAt": "2026-10-16T01:27:47.727Z",
+  "search": {
+    "enabled": true,
+    "configured": true,
+    "provider": "bing"
+  },
+  "coverage": [
+    {
+      "label": "普通攻略",
+      "query": "杭州 三日游 攻略",
+      "success": true,
+      "sourceCount": 8,
+      "matchingDomainCount": 8,
+      "sources": [
+        {
+          "url": "https://zhuanlan.zhihu.com/p/600917339",
+          "title": "杭州旅游攻略三日游最佳景点（去杭州玩三天怎么安排）",
+          "snippet": "2023年1月25日 · 杭州旅游攻略三日游最佳景点（去杭州玩三天怎么安排） 本里杭州站 杭州我已经算是去过3次了，有一部分旅游心得 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:27:48.021Z"
+        },
+        {
+          "url": "https://zhuanlan.zhihu.com/p/366541208",
+          "title": "杭州旅行攻略|杭州最全3日游攻略，景点+美食 - 知乎",
+          "snippet": "2021年7月6日 · 这个季节，大家想好去哪里玩了吗？ 作为一个旅游的狂热爱好者，我总结了一下自己曾去杭州旅游的经验，给大家分 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:27:48.022Z"
+        },
+        {
+          "url": "https://www.toutiao.com/article/7511977427904594469/",
+          "title": "杭州三日游超全攻略去了4次总结的省钱玩法 - 今日头条",
+          "snippet": "2025年6月4日 · ️ 三日精华路线 Day 抵达杭州→乌镇→西栅夜景→自由活动 Day 乌镇→南浔古镇→福严寺→西塘→赏西塘夜景 Day …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:27:48.022Z"
+        },
+        {
+          "url": "https://www.toutiao.com/article/7647162696512684582/",
+          "title": "杭州三日游超全攻略照着玩不踩雷不绕路 - 今日头条",
+          "snippet": "2026年6月3日 · 第一次去杭州真的别乱跑！ 我整理了这份三天两夜的路线，把西湖周边、灵隐寺、茅家埠这些必打卡的地方都串起来 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:27:48.022Z"
+        },
+        {
+          "url": "https://heji.baidu.com/view/93c2489e0429bd64783e0912a216147917117e1d.html",
+          "title": "杭州三日游最佳路线：经典景点+小众玩法全攻略",
+          "snippet": "杭州三日游最佳路线：经典景点+小众玩法全攻略-杭州作为江南水乡的代表城市，每年吸引数千万游客到访。 春秋两季（3-5月、9-11 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:27:48.023Z"
+        },
+        {
+          "url": "https://travelnews.qunar.com/qa_strategy/hangzhou-three-day-travel-guide-and-pitfall-guide",
+          "title": "杭州三日游怎么安排？有哪些避坑指南？ - 去哪儿",
+          "snippet": "2026年7月6日 · 西湖：门票免费，全天开放，江南三大名湖之一，兼具优美自然风光与丰富文化底蕴 断桥残雪：门票免费，全天开 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:27:48.023Z"
+        },
+        {
+          "url": "https://www.163.com/dy/article/L0QTG8HL0556KV63.html",
+          "title": "杭州旅游攻略必去景点｜2026三日游打卡美食避坑，实惠 ...",
+          "snippet": "2026年7月2日 · 本套三日行程严格对标 杭州旅游攻略必去景点 核心需求，动线顺畅不绕路，景点主次分明，动静结合适配老小，搭配 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:27:48.023Z"
+        },
+        {
+          "url": "https://www.163.com/dy/article/KMEAE9EA05568R6X.html",
+          "title": "杭州三日游全攻略，3日行程最佳安排，这样玩超值",
+          "snippet": "2026年2月23日 · 小田是土生土长的杭州人，对当地的历史文化和隐藏玩法门儿清，行程规划、门票预约这些琐事交给她，你只管轻松 …",
+          "query": "杭州 三日游 攻略",
+          "retrievedAt": "2026-10-16T01:27:48.023Z"
+        }
+      ]
+    },
+    {
+      "label": "小红书",
+      "query": "site:xiaohongshu.com 杭州 西湖 旅游 攻略",
+      "success": true,
+      "sourceCount": 0,
+      "matchingDomainCount": 0,
+      "sources": []
+    },
+    {
+      "label": "抖音",
+      "query": "site:douyin.com 杭州 西湖 旅游 攻略",
+      "success": true,
+      "sourceCount": 0,
+      "matchingDomainCount": 0,
+      "sources": []
+    }
+  ],
+  "model": {
+    "success": false,
+    "error": "服务暂时无法完成请求，请稍后重试并检查服务配置。"
+  }
+}

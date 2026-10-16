@@ -1,0 +1,40 @@
+{
+  "checkedAt": "2026-10-16T01:24:39.390Z",
+  "search": {
+    "enabled": true,
+    "configured": true,
+    "provider": "bing"
+  },
+  "coverage": [
+    {
+      "label": "普通攻略",
+      "query": "杭州 三日游 攻略",
+      "success": false,
+      "error": "无法连接网页搜索服务，请检查网络。"
+    },
+    {
+      "label": "小红书",
+      "query": "site:xiaohongshu.com 杭州 西湖 旅游 攻略",
+      "success": false,
+      "error": "无法连接网页搜索服务，请检查网络。"
+    },
+    {
+      "label": "抖音",
+      "query": "site:douyin.com 杭州 西湖 旅游 攻略",
+      "success": false,
+      "error": "无法连接网页搜索服务，请检查网络。"
+    }
+  ],
+  "model": {
+    "provider": "siliconflow",
+    "model": "zai-org/GLM-5.3-Flash",
+    "success": false,
+    "calls": [],
+    "answer": {
+      "answer": "很抱歉，我按要求多次尝试联网检索（共10次，查询词包括“杭州西湖旅游攻略 游玩路线建议”“西湖一日游 景点推荐”及英文“West Lake Hangzhou travel guide tips”等），但网页搜索服务每次均返回错误（提示“无法连接网页搜索服务/服务暂时无法完成请求”），始终未能获得任何真实检索摘录。因此，我无法提供经过实际检索结果验证的两条游玩建议，也无法给出真实检索到的来源链接，不应编造攻略内容或来源 URL。建议稍后重新发起检索，或通过杭州西湖风景名胜区官方渠道等权威来源查询最新攻略。另请注意：sources 中仅包含一个满足格式要求的占位符链接，并非检索结果，请勿将其视为真实来源。",
+      "sources": [
+        "https://www.example.com/"
+      ]
+    }
+  }
+}

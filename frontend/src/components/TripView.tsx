@@ -2,7 +2,10 @@ import { useState } from 'react';
 import {
   ArrowUpRight,
   BedDouble,
+  Bike,
   BookOpen,
+  BusFront,
+  CarFront,
   Camera,
   ChevronDown,
   Clock3,
@@ -32,6 +35,9 @@ export default function TripView({
   const [revision, setRevision] = useState('');
   const route = trip.routes[routeIndex] ?? trip.routes[0]!;
   const day = route.days[dayIndex] ?? route.days[0]!;
+  const aiTransport = route.days.some((item) =>
+    item.segments.some((segment) => segment.source === 'ai'),
+  );
   const selectPoi = (id: string) => {
     setTab('itinerary');
     setSelectedPoi(id);
@@ -111,6 +117,7 @@ export default function TripView({
         </div>
       </div>
       <MapView
+        key={`${trip.id}:${trip.updatedAt}:${route.id}:${dayIndex}`}
         trip={trip}
         route={route}
         dayIndex={dayIndex}
@@ -142,6 +149,7 @@ export default function TripView({
               <div className="day-intro">
                 <span className="eyebrow">{day.date ?? `第 ${day.day} 天`}</span>
                 <h3>{day.title}</h3>
+                {day.startTime && <p>AI 建议 {day.startTime} 出发</p>}
                 <p>{day.overview}</p>
               </div>
               <div className="timeline">
@@ -157,7 +165,15 @@ export default function TripView({
                       <div className="stop-main">
                         {incoming && (
                           <div className="incoming-route">
-                            <Footprints size={13} />
+                            {incoming.mode === 'transit' ? (
+                              <BusFront size={13} />
+                            ) : incoming.mode === 'driving' ? (
+                              <CarFront size={13} />
+                            ) : incoming.mode === 'cycling' ? (
+                              <Bike size={13} />
+                            ) : (
+                              <Footprints size={13} />
+                            )}
                             {incoming.summary} · {incoming.durationMinutes} 分钟 ·{' '}
                             {(incoming.distanceMeters / 1000).toFixed(1)} km
                           </div>
@@ -265,7 +281,7 @@ export default function TripView({
             <strong className="budget-total">
               <small>约</small> ¥{route.totalEstimatedBudget}
             </strong>
-            <p>每人 · 市内行程参考费用</p>
+            <p>每人 · 行程参考总费用</p>
             <dl>
               <div>
                 <dt>门票参考</dt>
@@ -280,12 +296,14 @@ export default function TripView({
                 <dd>¥{trip.request.includeHotel ? route.estimatedHotelBudget : 0}</dd>
               </div>
               <div>
-                <dt>高德已知交通费</dt>
+                <dt>{aiTransport ? 'AI 参考交通费' : '高德已知交通费'}</dt>
                 <dd>¥{route.transportCost.toFixed(0)}</dd>
               </div>
             </dl>
             <small>
-              门票、餐饮和住宿为 AI 估算；不含往返目的地的交通。驾车费用仅统计已知路桥费。
+              {aiTransport
+                ? '路线时间、距离与各项费用由 AI 安排或估算，包含行程中已安排的出发路段；未安排的返程不计入预算。'
+                : '门票、餐饮和住宿为 AI 估算；交通费用以行程中已安排的路段为准。驾车费用仅统计已知路桥费。'}
             </small>
           </section>
           <section className="revision-card">
@@ -317,9 +335,37 @@ export default function TripView({
               </ul>
             </section>
           )}
+          {trip.research && (
+            <section className="research-card" aria-label="联网攻略来源">
+              <h3>联网攻略来源</h3>
+              <p>本次规划检索到的资料；搜索摘录不代表已阅读全文或观看视频。</p>
+              {trip.research.sources.length > 0 && (
+                <details>
+                  <summary>查看 {trip.research.sources.length} 条来源</summary>
+                  <ul>
+                    {trip.research.sources.map((source) => (
+                      <li key={source.url}>
+                        <a href={source.url} target="_blank" rel="noopener noreferrer">
+                          {source.title}
+                        </a>
+                        <small>
+                          {new URL(source.url).hostname} · 检索于{' '}
+                          {new Date(source.retrievedAt).toLocaleDateString('zh-CN')}
+                        </small>
+                        {source.snippet && <p>{source.snippet.slice(0, 280)}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {trip.research.warnings.map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+            </section>
+          )}
           <p className="data-caption">
-            地点与交通来自高德地图。攻略由 AI
-            根据本次路线编写，开放时间、预约与价格以官方当日信息为准。
+            路线、交通方式、时间与攻略由 AI 规划，地点和导航数据由高德地图提供。 规划模型：
+            {trip.model}。开放时间、预约与价格以官方当日信息为准。
           </p>
         </aside>
       </div>
@@ -344,11 +390,29 @@ function exportGuide(trip: Trip, index: number) {
     `# ${route.title}`,
     `${trip.province.name} · ${trip.city.name} | ${trip.request.days} 天`,
     route.summary,
-    `每人参考预算：¥${route.totalEstimatedBudget}`,
+    `每人参考总预算：¥${route.totalEstimatedBudget}`,
+    `旅途起点：${trip.origin.name}`,
+    '交通时间与费用按已安排路段计入；未安排的返程不计入预算。',
     `\n## 路线攻略\n${route.guide.overview}`,
   ];
   for (const day of route.days) {
     lines.push(`\n## 第 ${day.day} 天：${day.title}`, day.overview);
+    if (day.startTime) lines.push(`AI 建议出发时间：${day.startTime}`);
+    const modeNames = { transit: '公共交通', walking: '步行', driving: '驾车', cycling: '骑行' };
+    for (const leg of day.legs ?? []) {
+      const name = (id: string) =>
+        id === 'origin' || id === trip.origin.id || id === trip.request.originPoiId
+          ? trip.origin.name
+          : (route.days
+              .flatMap((item) => [
+                ...item.stops.map((stop) => stop.poi),
+                ...(item.hotel ? [item.hotel] : []),
+              ])
+              .find((poi) => poi.id === id)?.name ?? id);
+      lines.push(
+        `- 交通安排：${name(leg.fromId)} → ${name(leg.toId)}，${modeNames[leg.mode]}。AI 选择理由：${leg.reason}`,
+      );
+    }
     for (const stop of day.stops) {
       lines.push(
         `\n### ${stop.arrival}–${stop.departure} ${stop.poi.name}`,
@@ -372,8 +436,19 @@ function exportGuide(trip: Trip, index: number) {
     ...route.guide.packingList.map((t) => `- ${t}`),
     '\n## 需确认',
     ...route.caveats.concat(route.warnings).map((t) => `- ${t}`),
-    '\n地点与交通来源：高德地图。攻略由 AI 编写；政策、预约与价格请以官方当日信息为准。',
+    '\n路线、交通方式、时间与攻略由 AI 规划；地点和导航数据来源：高德地图。政策、预约与价格请以官方当日信息为准。',
   );
+  if (trip.research) {
+    lines.push(
+      '\n## 联网攻略来源',
+      '本次检索资料，仅取得搜索摘录，不代表阅读全文或观看视频。',
+      ...trip.research.sources.map(
+        (source) =>
+          `- [${source.title.replace(/[\[\]\r\n]/g, ' ')}](<${source.url}>) · 检索于 ${source.retrievedAt}`,
+      ),
+      ...trip.research.warnings.map((warning) => `- ${warning}`),
+    );
+  }
   const url = URL.createObjectURL(
     new Blob([lines.join('\n\n')], { type: 'text/markdown;charset=utf-8' }),
   );

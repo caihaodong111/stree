@@ -1,17 +1,19 @@
-import { CodexClient } from '../codex/client.js';
 import { AmapService } from '../services/amap.js';
 import { createStore } from '../db/store.js';
-const codex = new CodexClient();
+import { ModelService } from '../models/service.js';
+import { PublicWebSearch } from '../services/web-search.js';
 const amap = new AmapService();
 const store = createStore();
 try {
-  const codexStatus = await codex.status();
+  const modelStatus = await new ModelService().status();
+  const storageAvailable = await store.check();
   console.log(
     JSON.stringify(
       {
-        codex: codexStatus,
+        ...modelStatus,
         amap: { configured: amap.configured },
-        storage: { driver: store.driver, available: await store.check() },
+        storage: { driver: store.driver, available: storageAvailable },
+        webSearch: new PublicWebSearch().status(),
       },
       null,
       2,
@@ -19,11 +21,10 @@ try {
   );
   if (amap.configured)
     console.log('高德行政区查询：', (await amap.district('330000'))[0]?.name ?? '未返回结果');
-  if (!codexStatus.authenticated) process.exitCode = 1;
+  if (!modelStatus.model.configured || !storageAvailable) process.exitCode = 1;
 } catch {
   console.error('外部服务检查失败，请检查网络和配置。');
   process.exitCode = 1;
 } finally {
-  await codex.close();
   await store.close();
 }

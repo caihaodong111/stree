@@ -1,12 +1,10 @@
 import { mkdir, readdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-import { desc, eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/mysql2';
-import mysql from 'mysql2/promise';
-import { TripSchema, type Trip, type TripSummary } from '@stree/shared';
+import type { Connection, Pool, RowDataPacket } from 'mysql2/promise';
+import { TripSchema, RegionSchema, type Trip, type TripSummary } from '@stree/shared';
 import { config, runtimeRoot } from '../config.js';
 import { AppError } from '../errors.js';
-import { tripsTable } from './schema.js';
+import { createMysqlPool, createTripsSql, historySql, parseJson } from './mysql.js';
 
 export interface TripStore {
   driver: string;
@@ -69,58 +67,110 @@ export class FileTripStore implements TripStore {
 }
 export class MysqlTripStore implements TripStore {
   driver = 'mysql';
-  private pool = mysql.createPool({
-    host: config.MYSQL_HOST,
-    port: config.MYSQL_PORT,
-    user: config.MYSQL_USER,
-    password: config.MYSQL_PASSWORD,
-    database: config.MYSQL_DATABASE,
-    charset: 'utf8mb4',
-    connectionLimit: 5,
-    connectTimeout: 5000,
-  });
-  private db = drizzle(this.pool);
-  async setup() {
-    await this.pool.execute(
-      'CREATE TABLE IF NOT EXISTS stree_trips (id VARCHAR(36) PRIMARY KEY, city_code VARCHAR(6) NOT NULL, title VARCHAR(128) NOT NULL, payload JSON NOT NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL) CHARACTER SET utf8mb4',
-    );
-  }
-  async save(trip: Trip) {
-    const row = {
-      id: trip.id,
-      cityCode: trip.city.adcode,
-      title: trip.routes[0]?.title ?? '旅行计划',
-      payload: trip,
-      createdAt: new Date(trip.createdAt),
-      updatedAt: new Date(trip.updatedAt),
-    };
+  constructor(private pool: Pool | Connection = createMysqlPool()) {}
+  private async query(sql: string, values: unknown[] = []) {
+    const connection = 'getConnection' in this.pool ? await this.pool.getConnection() : this.pool;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await this.db
-        .insert(tripsTable)
-        .values(row)
-        .onDuplicateKeyUpdate({
-          set: { payload: trip, title: row.title, updatedAt: row.updatedAt },
-        });
+      // Bound preparation and result transfer as well as statement execution. A timed-out
+      // socket is destroyed, so it cannot leave later requests queued behind a stuck query.
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          connection.destroy();
+          reject(new AppError('数据库操作超时。', 503, 'STORAGE_UNAVAILABLE'));
+        }, config.MYSQL_QUERY_TIMEOUT_MS);
+      });
+      return await Promise.race([
+        connection.execute<RowDataPacket[]>({
+          sql,
+          values,
+          timeout: config.MYSQL_QUERY_TIMEOUT_MS,
+        }),
+        deadline,
+      ]);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'PROTOCOL_SEQUENCE_TIMEOUT')
+        connection.destroy();
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      if (
+        'getConnection' in this.pool &&
+        'release' in connection &&
+        typeof connection.release === 'function'
+      )
+        connection.release();
+    }
+  }
+  async setup() {
+    await this.query(createTripsSql);
+    // Schema upgrades are explicit maintenance operations, never request-time DDL.
+    await this.query(`${historySql.replace('LIMIT 30', 'LIMIT 0')}`);
+  }
+  async save(input: Trip) {
+    const trip = TripSchema.parse(input);
+    if (!validId(trip.id) || trip.id.length > 36) throw new AppError('行程 ID 无效。');
+    const createdAt = new Date(trip.createdAt);
+    const updatedAt = new Date(trip.updatedAt);
+    if (!Number.isFinite(+createdAt) || !Number.isFinite(+updatedAt))
+      throw new AppError('行程时间无效。');
+    try {
+      // A single atomic upsert keeps the light history fields and full payload consistent.
+      await this.query(
+        `INSERT INTO stree_trips
+        (id, title, city, days, summary, payload, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE title=VALUES(title), city=VALUES(city), days=VALUES(days),
+          summary=VALUES(summary), payload=VALUES(payload), created_at=VALUES(created_at),
+          updated_at=VALUES(updated_at)`,
+        [
+          trip.id,
+          trip.routes[0]?.title ?? '旅行计划',
+          JSON.stringify(trip.city),
+          trip.request.days,
+          trip.summary,
+          JSON.stringify(trip),
+          createdAt,
+          updatedAt,
+        ],
+      );
     } catch {
       throw new AppError(
-        '行程保存失败，请检查 MySQL 连接并执行 npm run db:setup。',
+        '行程保存失败，数据库暂时不可用，请稍后重试。',
         503,
         'STORAGE_UNAVAILABLE',
       );
     }
   }
-  async get(id: string) {
-    const rows = await this.db.select().from(tripsTable).where(eq(tripsTable.id, id)).limit(1);
-    return rows[0] ? TripSchema.parse(rows[0].payload) : null;
+  async get(id: string): Promise<Trip | null> {
+    if (!validId(id) || id.length > 36) return null;
+    let rows: RowDataPacket[];
+    try {
+      [rows] = await this.query('SELECT payload FROM stree_trips WHERE id = ? LIMIT 1', [id]);
+    } catch {
+      throw new AppError('行程读取失败，数据库暂时不可用。', 503, 'STORAGE_UNAVAILABLE');
+    }
+    return rows[0] ? TripSchema.parse(parseJson(rows[0].payload)) : null;
   }
-  async list() {
-    return (
-      await this.db.select().from(tripsTable).orderBy(desc(tripsTable.updatedAt)).limit(30)
-    ).map((row) => summary(TripSchema.parse(row.payload)));
+  async list(): Promise<TripSummary[]> {
+    let rows: RowDataPacket[];
+    try {
+      [rows] = await this.query(historySql);
+    } catch {
+      throw new AppError('历史行程读取失败，数据库暂时不可用。', 503, 'STORAGE_UNAVAILABLE');
+    }
+    return rows.map((row) => ({
+      id: row.id,
+      city: RegionSchema.parse(parseJson(row.city)),
+      title: row.title,
+      days: row.days,
+      summary: row.summary,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
   }
   async check() {
     try {
-      await this.pool.execute('SELECT id FROM stree_trips LIMIT 1');
+      await this.query('SELECT id, city, days, summary FROM stree_trips LIMIT 0');
       return true;
     } catch {
       return false;

@@ -3,6 +3,8 @@ import { createInterface } from 'node:readline';
 const send = (message) => process.stdout.write(JSON.stringify(message) + '\n');
 let initialized = false;
 let generation;
+let threadModel;
+let turnEffort;
 createInterface({ input: process.stdin }).on('line', (line) => {
   const message = JSON.parse(line);
   const { id, method, params } = message;
@@ -14,9 +16,34 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   if (!initialized) return send({ id, error: { code: -1, message: 'Missing initialized' } });
   if (method === 'account/read') return send({ id, result: { account: { type: 'chatgpt' } } });
   if (method === 'model/list')
-    return send({ id, result: { data: [{ model: 'test-model', isDefault: true }] } });
-  if (method === 'thread/start') return send({ id, result: { thread: { id: 'test-thread' } } });
+    return send({
+      id,
+      result: {
+        data: [
+          {
+            model: 'test-model',
+            isDefault: true,
+            defaultReasoningEffort: 'medium',
+            supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Balanced' }],
+          },
+          {
+            model: 'test-deep',
+            displayName: 'Deep model',
+            defaultReasoningEffort: 'high',
+            supportedReasoningEfforts: [
+              { reasoningEffort: 'high', description: 'Deep' },
+              { reasoningEffort: 'xhigh', description: 'Deeper' },
+            ],
+          },
+        ],
+      },
+    });
+  if (method === 'thread/start') {
+    threadModel = params.model;
+    return send({ id, result: { thread: { id: 'test-thread' } } });
+  }
   if (method === 'turn/start') {
+    turnEffort = params.effort;
     send({ id, result: { turn: { id: 'test-turn' } } });
     send({
       method: 'turn/started',
@@ -58,7 +85,11 @@ createInterface({ input: process.stdin }).on('line', (line) => {
         item: {
           type: 'agentMessage',
           phase: 'final_answer',
-          text: JSON.stringify({ toolResult: message.result }),
+          text: JSON.stringify({
+            toolResult: message.result,
+            model: threadModel,
+            effort: turnEffort,
+          }),
         },
       },
     });
