@@ -12,7 +12,7 @@
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 
-[界面预览](#界面预览) · [快速开始](#快速开始) · [模型接入](#模型接入) · [部署](#部署) · [常见问题](#常见问题) · [参与贡献](#参与贡献)
+[界面预览](#界面预览) · [快速开始](#快速开始) · [模型接入](#模型接入) · [部署](#部署) · [常见问题](#常见问题) · [参与贡献](#参与贡献) · [软件著作权](#软件著作权) · [联系与合作](#联系与合作)
 
 AI travel planner for Chinese cities, with AMap routes, bring-your-own models, and self-hosting.
 
@@ -64,6 +64,8 @@ AI travel planner for Chinese cities, with AMap routes, bring-your-own models, a
 | 一个支持工具调用、可关闭思考模式的模型 API | 生成行程并调用地图、搜索工具 |
 
 默认不需要 MySQL，也不需要安装或登录 Codex CLI。当前规划入口使用你在页面中配置的模型 API。
+
+首次运行需要自行准备模型账号或 API Key，并配置模型提供方、API 根地址和模型 ID；相关费用由所使用的服务商收取。应用不会自动使用开发者本机的模型配置。
 
 ### 2. 下载项目并安装依赖
 
@@ -384,6 +386,36 @@ npm run check:web-search                  # 使用已配置模型验证工具循
 可参与的改进方向包括模型兼容性、行程质量评估、地图交互、无障碍体验、多语言文档，以及部署与访问控制。这些是欢迎讨论的方向，尚不代表已实现的功能或发布承诺。
 
 如果 STREE 帮你安排了一次旅行，欢迎分享使用体验，也可以点一个 **Star**，方便继续关注项目。
+
+## 软件著作权
+
+软件著作权登记信息如下，名称与版本按证书原文展示：
+
+| 项目     | 证书记载                   |
+| -------- | -------------------------- |
+| 软件名称 | 基于AI的个性化旅行规划系统 |
+| 简称     | 智悦规划                   |
+| 登记版本 | V1.0                       |
+| 登记号   | `2025SR1317783`            |
+| 证书号   | 软著登字第15973981号       |
+| 登记日期 | 2025 年 7 月 21 日         |
+
+<details>
+<summary><strong>查看软件著作权登记证书（姓名与单位名称已打码）</strong></summary>
+
+<img src="docs/assets/software-copyright-redacted.jpg" alt="计算机软件著作权登记证书，个人姓名、单位名称、二维码及条码已遮挡" width="560" />
+
+为保护隐私，证书中的所有个人姓名、单位名称及二维码、条码均已遮挡。
+
+[查看脱敏版证书 PDF](output/pdf/software-copyright-redacted.pdf)
+
+</details>
+
+## 联系与合作
+
+**联系方式：看主页。** 请查看[我的 GitHub 主页](https://github.com/caihaodong111)，通过主页公开的联系方式联系。
+
+**商用合作请联系。** 欢迎就商业合作、定制开发与项目合作进行交流。
 
 ## 许可与致谢
 
