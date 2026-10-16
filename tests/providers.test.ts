@@ -20,7 +20,12 @@ import { FileTripStore } from '../backend/src/db/store.js';
 import { FileAiStore } from '../backend/src/db/ai-store.js';
 import type { AmapService } from '../backend/src/services/amap.js';
 import { agentPlan, city, places, request, tripFixture } from './fixtures/travel.js';
-import { createOutputDecoder, queryKey } from '../backend/src/models/output.js';
+import {
+  applyOutputUpdates,
+  createOutputDecoder,
+  joinModelJSON,
+  queryKey,
+} from '../backend/src/models/output.js';
 
 const servers: Server[] = [];
 const directories: string[] = [];
@@ -1082,7 +1087,14 @@ describe('生产行程格式与查询收尾回归', () => {
       if (rounds === 1)
         return reply(respond('openai-completions', '{"summary":"三日游","routes":[]}'));
       expect(JSON.stringify(body.messages)).toContain('展示字段不符合 schema');
-      reply(respond('openai-completions', JSON.stringify(agentPlan())));
+      reply(
+        respond(
+          'openai-completions',
+          JSON.stringify({
+            updates: [{ path: '/routes', value: agentPlan().routes, remove: false }],
+          }),
+        ),
+      );
     });
     const result = await generateWithProvider(base(url), 'vendor-model', {
       ...options(),
@@ -1417,4 +1429,128 @@ describe('生产行程格式与查询收尾回归', () => {
     });
     expect(bodies[1].response_format).toEqual({ type: 'json_object' });
   });
+});
+
+it('真实续写边界漏引号且缺标题时，只补边界引号并恢复标题，其他行程逐字保留', async () => {
+  const expected = agentPlan();
+  const missing = structuredClone(expected) as any;
+  delete missing.routes[0].title;
+  const full = JSON.stringify(missing);
+  const cut = full.indexOf('"arrival":"') + '"arrival":"'.length + 5;
+  expect(full[cut]).toBe('"');
+  const prefix = full.slice(0, cut);
+  const suffix = full.slice(cut + 1);
+  expect(() => JSON.parse(prefix + suffix)).toThrow();
+  expect(JSON.parse(joinModelJSON(prefix, suffix))).toEqual(missing);
+  let rounds = 0;
+  const url = await server((_route, body, _headers, reply) => {
+    rounds++;
+    const content =
+      rounds === 1
+        ? prefix
+        : rounds === 2
+          ? suffix
+          : JSON.stringify({
+              updates: [
+                { path: '/routes/0/title', value: expected.routes[0]!.title, remove: false },
+              ],
+            });
+    if (rounds === 3) {
+      expect(body.max_tokens).toBe(1024);
+      expect(body.tools).toEqual([]);
+      expect(body.messages[0].content).toContain('只修复');
+    }
+    reply({ choices: [{ message: { content }, finish_reason: rounds === 1 ? 'length' : 'stop' }] });
+  });
+  const result = await generateWithProvider(base(url), 'test', {
+    ...options(),
+    outputSchema: z.toJSONSchema(AgentPlanSchema),
+  });
+  expect(JSON.parse(result.text)).toEqual(expected);
+  expect(rounds).toBe(3);
+});
+
+it('字段恢复不能修改其他路径、原型或数组项，也不会原地改写原始行程', () => {
+  const plan = agentPlan();
+  const original = structuredClone(plan);
+  expect(() =>
+    applyOutputUpdates(
+      plan,
+      [{ path: '/summary', value: '改动', remove: false }],
+      ['/routes/0/title'],
+    ),
+  ).toThrow();
+  expect(() =>
+    applyOutputUpdates(
+      plan,
+      [{ path: '/__proto__/polluted', value: true, remove: false }],
+      ['/__proto__/polluted'],
+    ),
+  ).toThrow();
+  expect(() =>
+    applyOutputUpdates(plan, [{ path: '/routes/0', value: {}, remove: false }], ['/routes/0']),
+  ).toThrow();
+  const updated = applyOutputUpdates(
+    plan,
+    [{ path: '/routes/0/title', value: '新标题', remove: false }],
+    ['/routes/0/title'],
+  ) as any;
+  expect(updated.routes[0].title).toBe('新标题');
+  expect(plan).toEqual(original);
+  expect(joinModelJSON('{"summary":"逗号', ',仍然是正文"}')).toBe('{"summary":"逗号,仍然是正文"}');
+});
+
+it('有 SSE 连接和模型请求时，服务关闭先取消任务，再释放连接并保存终态', async () => {
+  let started!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const url = await server(() => {
+    started();
+  });
+  const dir = await directory();
+  const providers = new ProviderStore(path.join(dir, 'providers.json'));
+  await providers.save({ ...base(url), clearApiKey: false }, true);
+  await providers.select({ providerId: 'test-vendor', model: 'vendor-model', effort: null });
+  const audit = new FileAiStore(path.join(dir, 'audit'));
+  const amap = {
+    configured: true,
+    district: vi
+      .fn()
+      .mockResolvedValue([{ adcode: '330000', districts: [{ ...city, center: '120.15,30.27' }] }]),
+    search: vi.fn().mockResolvedValue(places),
+  } as unknown as AmapService;
+  const app = await createApp({
+    providers,
+    amap,
+    store: new FileTripStore(path.join(dir, 'trips')),
+    audit,
+    logger: false,
+  });
+  await app.listen({ host: '127.0.0.1', port: 0 });
+  const { jobId } = (
+    await app.inject({ method: 'POST', url: '/api/plans', payload: request })
+  ).json();
+  await pending;
+  const response = await fetch(
+    `http://127.0.0.1:${(app.server.address() as { port: number }).port}/api/jobs/${jobId}/events`,
+  );
+  const reader = response.body!.getReader();
+  await reader.read();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      app.close(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(Error('SSE prevented shutdown')), 2000);
+      }),
+    ]);
+    const saved = await new FileAiStore(path.join(dir, 'audit')).get(jobId);
+    expect(saved!.status).toBe('cancelled');
+  } finally {
+    clearTimeout(timer);
+    await reader.cancel().catch(() => {});
+    app.server.closeAllConnections();
+    await app.close();
+  }
 });

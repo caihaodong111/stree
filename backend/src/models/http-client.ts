@@ -8,9 +8,16 @@ import type { StoredProvider } from './providers.js';
 import { AppError, publicError } from '../errors.js';
 import { config, runtimeRoot } from '../config.js';
 import { currentAiRecorder, traceAiCall, withAiResponse } from '../planning/ai-recorder.js';
-import { createOutputDecoder, queryKey, unwrapModelJSON } from './output.js';
+import {
+  applyOutputUpdates,
+  createOutputDecoder,
+  joinModelJSON,
+  queryKey,
+  unwrapModelJSON,
+} from './output.js';
 
 export type GenerateOptions = Parameters<CodexClient['generate']>[0] & {
+  fieldRecovery?: boolean;
   limits?: {
     maxToolRounds?: number;
     maxToolCalls?: number;
@@ -322,7 +329,7 @@ export async function generateWithProvider(
       throw error;
     }
   };
-  const system = `${options.instructions}\n查询预算最多 ${limits.maxToolRounds} 轮、${limits.maxToolCalls} 次工具请求。优先使用已提供的地点，只查询最终采用路线的必要区间；不要穷举交通方式或反复确认同一信息。资料足够就输出，不必用满预算。\n最终输出必须是完整 JSON，符合以下 JSON Schema：\n${JSON.stringify(options.outputSchema)}\n如果用户要求续写因长度限制中断的 JSON，本轮只输出从上次末尾开始的剩余内容；各段拼接后的完整 JSON 必须符合上述 Schema。`;
+  const system = `${options.instructions}\n查询预算最多 ${limits.maxToolRounds} 轮、${limits.maxToolCalls} 次工具请求。优先使用已提供的地点，只查询最终采用路线的必要区间；不要穷举交通方式或反复确认同一信息。资料足够就输出，不必用满预算。\n最终只输出紧凑 JSON，不缩进、不换行、不加解释；攻略字段每项一句话，简洁具体，保持全部必需字段。最终输出必须符合以下 JSON Schema：\n${JSON.stringify(options.outputSchema)}\n如果用户要求续写因长度限制中断的 JSON，本轮只输出从上次末尾开始的剩余内容；各段拼接后的完整 JSON 必须符合上述 Schema。`;
   const messages: object[] =
     provider.protocol === 'openai-completions'
       ? [
@@ -659,7 +666,7 @@ export async function generateWithProvider(
       }
       // A provider can mark a fully formed JSON document as length-limited.
       // Prefer a complete replacement if the model restarted instead of continuing.
-      const combined = partialText + text;
+      const combined = partialText ? joinModelJSON(partialText, text) : text;
       const combinedOutput = decode(combined);
       const currentOutput = partialText ? decode(text) : combinedOutput;
       if (!combinedOutput.error) return result(combinedOutput.text);
@@ -703,6 +710,87 @@ export async function generateWithProvider(
       repairs++;
       finishResearch();
       finalizationAnnounced = true;
+      if (
+        options.fieldRecovery !== false &&
+        failure.value &&
+        typeof failure.value === 'object' &&
+        !Array.isArray(failure.value) &&
+        failure.repairPaths?.length &&
+        failure.repairPaths.length <= 12 &&
+        failure.repairPaths.every((path) => path.startsWith('/') && !/\/\d+$/.test(path))
+      ) {
+        const paths = failure.repairPaths;
+        currentAiRecorder()?.event('output_recovery', {
+          attempt: repairs,
+          reason: failure.error,
+          mode: 'fields',
+          paths,
+        });
+        options.onProgress(`正在恢复 ${paths.length} 处展示字段，保留已生成的完整行程`);
+        const patchSchema = {
+          type: 'object',
+          additionalProperties: false,
+          required: ['updates'],
+          properties: {
+            updates: {
+              type: 'array',
+              minItems: 1,
+              maxItems: paths.length,
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['path', 'value', 'remove'],
+                properties: {
+                  path: { type: 'string', enum: paths },
+                  value: {},
+                  remove: { type: 'boolean' },
+                },
+              },
+            },
+          },
+        };
+        const fixed = await generateWithProvider(
+          { ...provider, maxOutputTokens: Math.min(provider.maxOutputTokens ?? 1024, 1024) },
+          model,
+          {
+            instructions:
+              '只修复行程展示格式的指定错误字段。不得改写其他内容，不调用工具。输出 updates；path 只能从允许路径选择，value 为该字段的正确值，remove 仅在错误字段应删除时为 true。不要输出完整行程。',
+            prompt: JSON.stringify({
+              originalRequest: options.prompt,
+              error: failure.error,
+              allowedPaths: paths,
+              itinerary: failure.value,
+            }),
+            outputSchema: patchSchema,
+            tools: [],
+            handleTool: async () => {
+              throw new Error('No tools during field recovery');
+            },
+            signal,
+            onProgress: options.onProgress,
+            fieldRecovery: false,
+            limits: { ...options.limits, maxToolRounds: 1, maxToolCalls: 1 },
+          },
+        );
+        const updates = JSON.parse(fixed.text).updates;
+        let patched: string;
+        try {
+          patched = JSON.stringify(applyOutputUpdates(failure.value, updates, paths));
+        } catch {
+          throw new AppError(
+            '模型格式恢复包含无效字段路径，已停止修改并保留原始记录。',
+            502,
+            'AI_OUTPUT_FORMAT',
+          );
+        }
+        const checked = decode(patched);
+        if (!checked.error) return result(checked.text);
+        throw new AppError(
+          '模型字段恢复仍未通过格式检查，原始行程已保留，请重试。',
+          502,
+          'AI_OUTPUT_FORMAT',
+        );
+      }
       // Re-emit the whole object; a malformed document cannot safely be continued or patched.
       partialText = '';
       continuations = 0;

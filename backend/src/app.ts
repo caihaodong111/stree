@@ -259,8 +259,12 @@ export async function createApp(
         : reply.sendFile('index.html'),
     );
   }
-  app.addHook('onClose', async () => {
+  // Cancel work before Fastify waits for active SSE connections to drain.
+  // Waiting until onClose deadlocks shutdown against those same connections.
+  app.addHook('preClose', async () => {
     await jobs.close();
+  });
+  app.addHook('onClose', async () => {
     await store.close();
     await audit.close();
   });

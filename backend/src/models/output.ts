@@ -22,7 +22,9 @@ export function createOutputDecoder(schema: object) {
   const validate = ajv.compile(schema);
   // Per-task schemas should not accumulate in Ajv's strong-reference cache.
   ajv.removeSchema(schema);
-  return (text: string): { text: string; error: string | null } => {
+  return (
+    text: string,
+  ): { text: string; error: string | null; value?: unknown; repairPaths?: string[] } => {
     const normalized = unwrapModelJSON(text);
     let value: unknown;
     try {
@@ -37,10 +39,81 @@ export function createOutputDecoder(schema: object) {
           (issue) =>
             `${issue.instancePath || '/'} ${issue.message}${issue.keyword === 'required' ? ` (${issue.params.missingProperty})` : ''}`,
         );
-      return { text: normalized, error: `展示字段不符合 schema：${errors?.join('；')}` };
+      const escape = (key: string) => key.replace(/~/g, '~0').replace(/\//g, '~1');
+      const repairPaths = [
+        ...new Set(
+          validate.errors?.map((issue) =>
+            issue.keyword === 'required'
+              ? `${issue.instancePath}/${escape(issue.params.missingProperty)}`
+              : issue.keyword === 'additionalProperties'
+                ? `${issue.instancePath}/${escape(issue.params.additionalProperty)}`
+                : issue.instancePath,
+          ),
+        ),
+      ];
+      return {
+        text: normalized,
+        value,
+        repairPaths,
+        error: `展示字段不符合 schema：${errors?.join('；')}`,
+      };
     }
-    return { text: normalized, error: null };
+    return { text: normalized, value, error: null };
   };
+}
+
+/** A provider may resume after a cut string as if its closing quote was sent.
+ * Accept that single boundary quote only when the entire joined document parses.
+ */
+export function joinModelJSON(prefix: string, suffix: string): string {
+  let inString = false;
+  let escaped = false;
+  for (const char of prefix) {
+    if (escaped) escaped = false;
+    else if (inString && char === '\\') escaped = true;
+    else if (char === '"') inString = !inString;
+  }
+  if (inString && !escaped && /^\s*[,}\]]/.test(suffix)) {
+    const joined = prefix + '"' + suffix;
+    try {
+      JSON.parse(unwrapModelJSON(joined));
+      return joined;
+    } catch {
+      /* Other syntax errors need model recovery. */
+    }
+  }
+  return prefix + suffix;
+}
+
+/** Apply only the schema validator's exact error paths; preserve every other field. */
+export function applyOutputUpdates(
+  value: unknown,
+  updates: { path: string; value: unknown; remove: boolean }[],
+  allowed: string[],
+) {
+  const result = structuredClone(value);
+  for (const update of updates) {
+    if (!allowed.includes(update.path) || !update.path.startsWith('/'))
+      throw new Error('Invalid recovery path');
+    const keys = update.path
+      .slice(1)
+      .split('/')
+      .map((k) => k.replace(/~1/g, '/').replace(/~0/g, '~'));
+    if (keys.some((k) => ['__proto__', 'constructor', 'prototype'].includes(k)))
+      throw new Error('Unsafe recovery path');
+    let parent: any = result;
+    for (const key of keys.slice(0, -1)) {
+      if (!parent || typeof parent !== 'object' || !Object.hasOwn(parent, key))
+        throw new Error('Missing recovery parent');
+      parent = parent[key];
+    }
+    const key = keys.at(-1)!;
+    if (!parent || typeof parent !== 'object' || Array.isArray(parent))
+      throw new Error('Recovery must target an object field');
+    if (update.remove) delete parent[key];
+    else parent[key] = update.value;
+  }
+  return result;
 }
 
 /** Equivalent parameter objects share a query even when keys arrive in a different order. */
