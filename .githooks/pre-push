@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+scanner="$(command -v gitleaks || true)"
+if [ -z "$scanner" ] && [ -x "$HOME/.local/bin/gitleaks" ]; then
+  scanner="$HOME/.local/bin/gitleaks"
+fi
+if [ -z "$scanner" ]; then
+  echo "Push blocked: install Gitleaks, then retry. See SECURITY.md." >&2
+  exit 1
+fi
+
+for file in $(git ls-tree -r --name-only HEAD); do
+  case "$file" in
+    .env.example|*/.env.example|.env.*.example|*/.env.*.example) ;;
+    .env|*/.env|.env.*|*/.env.*|provider-settings.json|*/provider-settings.json)
+      echo "Push blocked: local credential configuration is tracked: $file" >&2
+      exit 1
+      ;;
+  esac
+done
+
+exec "$scanner" git . --redact=100 --no-banner --log-opts=--all
