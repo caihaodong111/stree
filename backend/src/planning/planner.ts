@@ -151,6 +151,17 @@ export class TravelPlanner {
           422,
           'SELECTED_PLACE_NOT_FOUND',
         );
+      // Autocomplete can confirm an ID and coordinates even when the detail
+      // endpoint has no record; unknown venue metadata remains explicitly null.
+      poiMap.set(resolved.id, {
+        category: '行程起点',
+        phone: null,
+        openingHours: null,
+        referencePrice: null,
+        source: 'amap',
+        fetchedAt: new Date().toISOString(),
+        ...resolved,
+      });
       origin = {
         name: resolved.name,
         location: resolved.location,
@@ -162,6 +173,7 @@ export class TravelPlanner {
       const resolved = places[0];
       if (!resolved)
         throw new AppError(`未能找到出发地“${request.origin}”，请填写更完整的名称。`, 422);
+      poiMap.set(resolved.id, resolved);
       origin = {
         name: resolved.name,
         location: resolved.location,
@@ -388,6 +400,16 @@ export class TravelPlanner {
     }
     const point = (id: string): RoutePoint =>
       id === 'origin' || id === origin.id ? origin : poiMap.get(id)!;
+    const displayPoi = (id: string): Poi => {
+      const poi = poiMap.get(id === 'origin' ? (origin.id ?? id) : id);
+      if (!poi)
+        throw new AppError(
+          `行程地点 ${id} 缺少展示资料，请指定实际出发地点后重新生成。`,
+          502,
+          'PLACE_DATA_UNAVAILABLE',
+        );
+      return id === 'origin' ? { ...poi, id } : poi;
+    };
     // Bind real place records and optional navigation geometry. All itinerary decisions,
     // times, modes, distances and budgets remain exactly as returned by the model.
     const routes: Route[] = plan.routes.map((route) => ({
@@ -395,8 +417,8 @@ export class TravelPlanner {
       days: route.days.map((day) => ({
         ...day,
         date: dateAt(request.startDate, day.day - 1),
-        stops: day.stops.map((stop) => ({ ...stop, poi: poiMap.get(stop.poiId)! })),
-        hotel: day.hotelPoiId ? poiMap.get(day.hotelPoiId)! : null,
+        stops: day.stops.map((stop) => ({ ...stop, poi: displayPoi(stop.poiId) })),
+        hotel: day.hotelPoiId ? displayPoi(day.hotelPoiId) : null,
         segments: day.legs.map((leg): Segment => {
           const from = point(leg.fromId),
             to = point(leg.toId);

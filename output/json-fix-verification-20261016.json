@@ -1,110 +1,31 @@
 {
-  "checkedAt": "2026-10-16T09:19:49.039Z",
-  "base": "http://115.190.55.138",
-  "originalJobId": "8a6c6f12-ea06-4da5-a4df-afb753d2533c",
-  "jobId": "43f88685-11d9-461b-83ae-9cea72fe224e",
-  "tripId": "1a5d1502-ab2e-4811-a929-97e34415547b",
-  "durationSeconds": 60,
-  "model": "Qwen/Qwen3.8-27B",
-  "engine": "custom-provider",
-  "checks": {
-    "threeDays": false,
-    "mustVisits": true,
-    "hasHotels": false,
-    "schemaUsed": true,
-    "noFormatRecoveryFailure": true
+  "sourceRunId": "cc643324-ab96-4ba7-8136-8b99453450e8",
+  "jobId": "6a502729-1f79-487f-b10f-0003adc3a8ab",
+  "status": "completed",
+  "replayedModelResponses": 7,
+  "tripId": "ee937c2b-4399-4dea-a6c1-dbc601f3b2ee",
+  "title": "北京3日经典文化人文行：故宫胡同+海淀高校科技园",
+  "days": [
+    3
+  ],
+  "mustVisits": true,
+  "hotels": [
+    [
+      "JAMES JOYCE COFFETEL喆啡酒店(北京天安门广场王府井地铁站店)",
+      "JAMES JOYCE COFFETEL喆啡酒店(北京天安门广场王府井地铁站店)",
+      null
+    ]
+  ],
+  "tripSchemaValid": true,
+  "verificationMode": "real-recorded-model-response-replay",
+  "publicReadChecks": {
+    "tripSchemaValid": true,
+    "jobCompleted": true,
+    "historyContainsTrip": true,
+    "originStopBound": true,
+    "settingsDisabled": true
   },
-  "modelCalls": 1,
-  "tools": 0,
-  "recoveryEvents": [],
-  "routes": [
-    {
-      "title": "北京历史文化3日游",
-      "days": [
-        {
-          "day": 1,
-          "stops": [
-            {
-              "id": "B000A8UIN8",
-              "name": "故宫博物院"
-            },
-            {
-              "id": "B0FFFAH7I9",
-              "name": "南锣鼓巷"
-            }
-          ],
-          "firstLeg": {
-            "fromId": "origin",
-            "toId": "B000A8UIN8",
-            "mode": "transit",
-            "reason": "从太原到北京的快速交通",
-            "durationMinutes": 100,
-            "distanceMeters": 260000,
-            "price": 580,
-            "summary": "高铁G字头，约3小时20分"
-          }
-        },
-        {
-          "day": 2,
-          "stops": [
-            {
-              "id": "B000A8WSBE",
-              "name": "中关村"
-            },
-            {
-              "id": "B000A7BD6C",
-              "name": "清华大学"
-            },
-            {
-              "id": "B000A816R6",
-              "name": "北京大学"
-            }
-          ],
-          "firstLeg": {
-            "fromId": "B000A8UIN8",
-            "toId": "B000A8WSBE",
-            "mode": "transit",
-            "reason": "地铁前往海淀",
-            "durationMinutes": 25,
-            "distanceMeters": 6500,
-            "price": 0,
-            "summary": "地铁2号线，转4号线，约25分钟"
-          }
-        },
-        {
-          "day": 3,
-          "stops": [
-            {
-              "id": "B000A16E89",
-              "name": "圆明园遗址公园"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "北京快速游",
-      "days": [
-        {
-          "day": 1,
-          "stops": [
-            {
-              "id": "B000A60DA1",
-              "name": "天安门"
-            }
-          ],
-          "firstLeg": {
-            "fromId": "origin",
-            "toId": "B000A60DA1",
-            "mode": "transit",
-            "reason": "高铁抵京",
-            "durationMinutes": 200,
-            "distanceMeters": 260000,
-            "price": 580,
-            "summary": "3小时20分钟"
-          }
-        }
-      ]
-    }
-  ]
+  "onlineModel": "zai-org/GLM-5.2",
+  "checkedAt": "2026-10-16T09:58:55.659Z",
+  "automatedTests": 169
 }

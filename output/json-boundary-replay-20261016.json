@@ -1,0 +1,15 @@
+{
+  "sourceRunId": "5ff991f6-96bf-482a-9c6b-ec3e7470c730",
+  "replayRunId": "24cf9328-43a6-42a5-b05a-9cf4623e7b6c",
+  "sourceModel": "deepseek-ai/DeepSeek-V3.2",
+  "repairModel": "zai-org/GLM-5.2",
+  "replayedResponses": 2,
+  "actualModelRequests": 1,
+  "valid": true,
+  "unrelatedFieldsPreserved": true,
+  "days": [
+    3
+  ],
+  "toolCalls": 0,
+  "durationSeconds": 2
+}

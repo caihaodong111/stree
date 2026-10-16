@@ -7,6 +7,7 @@ import { TravelPlanner } from '../backend/src/planning/planner.js';
 import { AppError } from '../backend/src/errors.js';
 import { agentPlan, city, places, poi, request } from './fixtures/travel.js';
 import type { TravelWebSearch } from '../backend/src/services/web-search.js';
+import { TripSchema } from '@stree/shared';
 function setup(webSearch?: TravelWebSearch) {
   const amap = {
     district: vi.fn().mockResolvedValue([
@@ -375,3 +376,40 @@ describe('AI 行程直通、地图工具与保存', () => {
     expect(trip.research).toMatchObject({ status: 'completed', sources: [source] });
   });
 });
+
+it.each(['selected', 'origin'])(
+  '跨城出发站作为首尾停靠点时绑定真实 POI 并可保存（%s）',
+  async (originId) => {
+    const { planner, codex, amap, store } = setup();
+    const selected = {
+      ...poi('selected', '太原南站'),
+      adcode: '140105',
+      location: { longitude: 112.61, latitude: 37.79 },
+    };
+    amap.detail.mockImplementation(async (id) =>
+      id === 'selected' ? selected : (places.find((p) => p.id === id) ?? null),
+    );
+    codex.generate.mockImplementation(async (options) => {
+      await options.handleTool('search_hotels', { keyword: '西湖酒店' });
+      const draft = agentPlan();
+      const first = draft.routes[0]!.days[0]!;
+      const last = draft.routes[0]!.days.at(-1)!;
+      first.stops.unshift({ ...first.stops[0]!, poiId: originId });
+      last.stops.push({ ...last.stops[0]!, poiId: originId });
+      return { text: JSON.stringify(draft), model: 'test-ai', threadId: 'station-stop' };
+    });
+    const trip = await planner.plan(
+      { ...request, origin: '太原南站', originPoiId: 'selected' },
+      new AbortController().signal,
+      () => {},
+    );
+    expect(trip.routes[0]!.days[0]!.stops[0]!.poi).toMatchObject({
+      id: originId,
+      name: '太原南站',
+      location: selected.location,
+    });
+    expect(trip.routes[0]!.days.at(-1)!.stops.at(-1)!.poi.name).toBe('太原南站');
+    expect(TripSchema.safeParse(trip).success).toBe(true);
+    expect(store.save).toHaveBeenCalledOnce();
+  },
+);
